@@ -1,0 +1,59 @@
+import Customer from "../models/Customer.js";
+
+// ✅ Create Customer
+export const createCustomer = async (req, res) => {
+  try {
+    const customer = await Customer.create(req.body);
+    res.status(201).json(customer);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Get All Customers
+export const getCustomers = async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ createdAt: -1 });
+    res.status(200).json(customers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Get Customer by ID
+export const getCustomerById = async (req, res) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
+    res.status(200).json(customer);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Update Customer
+export const updateCustomer = async (req, res) => {
+  try {
+    const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
+    res.status(200).json(customer);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Delete Customer
+export const deleteCustomer = async (req, res) => {
+  try {
+    const customer = await Customer.findByIdAndDelete(req.params.id);
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
+    res.status(200).json({ message: "Customer deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
