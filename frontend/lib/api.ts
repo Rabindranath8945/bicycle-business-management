@@ -1,5 +1,5 @@
 // frontend/lib/api.ts
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+export const API_BASE = "https://mandal-cycle-pos-api.onrender.com";
 
 export async function fetcher(path: string, opts: RequestInit = {}) {
   const res = await fetch(API_BASE + path, {
@@ -8,7 +8,7 @@ export async function fetcher(path: string, opts: RequestInit = {}) {
     ...opts,
   });
   if (!res.ok) {
-    const err = await res.json().catch(()=>({message:res.statusText}));
+    const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || "API error");
   }
   return res.json();
