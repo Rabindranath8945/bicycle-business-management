@@ -19,25 +19,12 @@ dotenv.config();
 const app = express();
 
 /* ✅ Proper CORS Setup */
-const allowedOrigins = [
-  "http://localhost:3000", // local frontend
-  "https://mandal-cycle-pos.vercel.app", // production frontend
-];
-
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://your-frontend.vercel.app"; // set in Render env
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = `🚫 CORS blocked request from unallowed origin: ${origin}`;
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
+    origin: FRONTEND_URL,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 

@@ -1,168 +1,186 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "@/lib/axiosInstance";
 import { motion } from "framer-motion";
-import { FiSearch, FiEdit, FiTrash2, FiPlus } from "react-icons/fi";
+import {
+  Search,
+  Package,
+  Edit,
+  Trash2,
+  PlusCircle,
+  Layers,
+  Tag,
+  PackageOpen,
+} from "lucide-react";
 import Link from "next/link";
 
-export default function ProductListPage() {
-  const [products, setProducts] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-  const [loading, setLoading] = useState(true);
+interface Product {
+  _id: string;
+  name: string;
+  category?: string;
+  price?: number;
+  stock?: number;
+  hsn?: string;
+  image?: string;
+  createdAt?: string;
+}
 
-  // Fetch products and categories
+export default function ProductListPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filtered, setFiltered] = useState<Product[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProducts = async () => {
       try {
-        const [prodRes, catRes] = await Promise.all([
-          axios.get("/products"),
-          axios.get("/categories"),
-        ]);
-        setProducts(prodRes.data);
-        setFiltered(prodRes.data);
-        setCategories(["All", ...catRes.data.map((c: any) => c.name)]);
-      } catch (err) {
-        console.error("Error fetching data:", err);
+        setLoading(true);
+        const res = await axios.get("/products");
+        setProducts(res.data || []);
+        setFiltered(res.data || []);
+      } catch (err: any) {
+        setError(err.response?.data?.message || err.message);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+    fetchProducts();
   }, []);
 
-  // Filter logic
-  useEffect(() => {
-    let result = products;
-    if (category !== "All") {
-      result = result.filter((p: any) => p.category === category);
-    }
-    if (search.trim() !== "") {
-      result = result.filter(
-        (p: any) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.hsn?.toLowerCase().includes(search.toLowerCase()) ||
-          p.code?.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    setFiltered(result);
-  }, [search, category, products]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
-    try {
-      await axios.delete(`/products/${id}`);
-      setProducts((prev) => prev.filter((p: any) => p._id !== id));
-    } catch (err) {
-      console.error("Delete failed:", err);
-    }
+  const handleSearch = (e: any) => {
+    const value = e.target.value.toLowerCase();
+    setSearch(value);
+    setFiltered(
+      products.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(value) ||
+          p.category?.toLowerCase().includes(value) ||
+          p.hsn?.toLowerCase().includes(value)
+      )
+    );
   };
 
-  if (loading) {
+  if (loading)
     return (
-      <div className="flex justify-center items-center h-[80vh] text-gray-500">
-        Loading products...
+      <div className="p-6 text-gray-400 text-center">Loading products...</div>
+    );
+  if (error)
+    return (
+      <div className="p-6 text-red-500 text-center">
+        Error loading products: {error}
       </div>
     );
-  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
       className="p-6"
     >
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Products</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-emerald-400">
+            Product Inventory
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Manage your product catalog, stock, and pricing efficiently.
+          </p>
+        </div>
         <Link
-          href="/products/add"
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+          href="/products/new"
+          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg shadow-md transition"
         >
-          <FiPlus /> Add Product
+          <PlusCircle size={18} />
+          Add Product
         </Link>
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-3 mb-6">
-        <div className="relative w-full md:w-1/2">
-          <FiSearch className="absolute left-3 top-3 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name, HSN, or code"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-          />
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <Search
+          size={18}
+          className="absolute left-3 top-3 text-slate-400 pointer-events-none"
+        />
+        <input
+          type="text"
+          value={search}
+          onChange={handleSearch}
+          placeholder="Search products by name, category, or HSN..."
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+        />
+      </div>
+
+      {/* Product grid */}
+      {filtered.length === 0 ? (
+        <div className="text-center text-slate-400 py-10">
+          <PackageOpen className="mx-auto mb-3 text-slate-500" size={40} />
+          No products found.
         </div>
-
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="md:w-1/4 px-3 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+      ) : (
+        <motion.div
+          layout
+          className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
         >
-          {categories.map((cat, i) => (
-            <option key={i} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto bg-white dark:bg-gray-900 rounded-2xl shadow">
-        <table className="min-w-full border-collapse text-sm md:text-base">
-          <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-            <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Category</th>
-              <th className="p-3 text-left">HSN</th>
-              <th className="p-3 text-right">Stock</th>
-              <th className="p-3 text-right">Price</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-6 text-gray-500">
-                  No products found
-                </td>
-              </tr>
-            ) : (
-              filtered.map((p: any) => (
-                <tr
-                  key={p._id}
-                  className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          {filtered.map((p) => (
+            <motion.div
+              key={p._id}
+              layout
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              className="bg-slate-900/50 border border-slate-700 rounded-xl p-4 shadow-lg hover:border-emerald-500/50 transition relative"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Package className="text-emerald-400" size={20} />
+                  <h2 className="text-base font-semibold text-white truncate">
+                    {p.name || "Unnamed"}
+                  </h2>
+                </div>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    (p.stock ?? 0) > 10
+                      ? "bg-emerald-600/20 text-emerald-400"
+                      : (p.stock ?? 0) > 0
+                      ? "bg-yellow-600/20 text-yellow-400"
+                      : "bg-red-600/20 text-red-400"
+                  }`}
                 >
-                  <td className="p-3">{p.name}</td>
-                  <td className="p-3">{p.category}</td>
-                  <td className="p-3">{p.hsn || "-"}</td>
-                  <td className="p-3 text-right">{p.stock}</td>
-                  <td className="p-3 text-right">₹{p.price.toFixed(2)}</td>
-                  <td className="p-3 text-center flex justify-center gap-3">
-                    <Link
-                      href={`/products/edit/${p._id}`}
-                      className="text-blue-500 hover:text-blue-700"
-                    >
-                      <FiEdit />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(p._id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  {(p.stock ?? 0) > 0 ? `${p.stock} in stock` : "Out of stock"}
+                </span>
+              </div>
+
+              <p className="text-sm text-slate-400 truncate">
+                {p.category || "No Category"}
+              </p>
+
+              <div className="flex justify-between items-center mt-3">
+                <div className="flex items-center gap-1 text-emerald-400 font-semibold">
+                  <Tag size={15} />₹{Number(p.price ?? 0).toFixed(2)}
+                </div>
+                <span className="text-xs text-slate-400">
+                  HSN: {p.hsn || "—"}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-700">
+                <Link
+                  href={`/products/edit/${p._id}`}
+                  className="text-slate-400 hover:text-emerald-400 transition flex items-center gap-1 text-sm"
+                >
+                  <Edit size={15} /> Edit
+                </Link>
+                <button className="text-slate-400 hover:text-red-500 transition flex items-center gap-1 text-sm">
+                  <Trash2 size={15} /> Delete
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </motion.div>
   );
 }
