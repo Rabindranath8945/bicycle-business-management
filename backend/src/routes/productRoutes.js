@@ -16,7 +16,7 @@ const router = express.Router();
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "mandal-cycle-pos/products", // your Cloudinary folder name
+    folder: "bicycle-pos/products", // your Cloudinary folder name
     allowed_formats: ["jpg", "png", "jpeg", "webp"],
   },
 });

@@ -1,22 +1,19 @@
 import mongoose from "mongoose";
 
-const productSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    category: { type: String, required: true },
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-    salePrice: { type: Number, required: true },
-    costPrice: { type: Number, required: true },
-    wholesalePrice: { type: Number },
-    stock: { type: Number, default: 0 },
-    unit: { type: String },
-    hsn: { type: String },
-    sku: { type: String },
-    barcode: { type: String },
-    productNumber: { type: String },
-    photo: { type: String },
+const ProductSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
   },
-  { timestamps: true }
-);
+  salePrice: { type: Number, required: true },
+  costPrice: { type: Number, required: true },
+  stock: { type: Number, default: 0 },
+  unit: { type: String, default: "pcs" },
+  gst: { type: Number, default: 0 },
+  hsn: { type: String },
+  productNumber: { type: String },
+});
 
-export default mongoose.model("Product", productSchema);
+export default mongoose.model("Product", ProductSchema);

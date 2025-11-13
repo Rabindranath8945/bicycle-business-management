@@ -19,11 +19,26 @@ dotenv.config();
 const app = express();
 
 /* ✅ Proper CORS Setup */
-const FRONTEND_URL =
-  process.env.FRONTEND_URL || "https://your-frontend.vercel.app"; // set in Render env
+/* ✅ Allow localhost + production frontend */
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://bicycle-pos.vercel.app",
+  process.env.FRONTEND_URL, // optional
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (e.g. Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.log("❌ BLOCKED CORS:", origin);
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
