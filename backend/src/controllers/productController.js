@@ -87,7 +87,6 @@ export const getProducts = async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 }).lean();
 
-    // Format response for frontend
     const formatted = products.map((p) => ({
       _id: p._id,
       name: p.name,

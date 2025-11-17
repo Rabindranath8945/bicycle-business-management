@@ -14,7 +14,6 @@ import {
   Tag,
   Barcode,
   Hash,
-  Loader2,
   FilePlus2,
   IndianRupee,
 } from "lucide-react";
@@ -42,7 +41,6 @@ export default function AddProductPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const [generatedCodes, setGeneratedCodes] = useState({
     sku: "",
@@ -65,7 +63,7 @@ export default function AddProductPage() {
   //
   useEffect(() => {
     axios
-      .get("/categories")
+      .get("/api/categories")
       .then((res) => setCategories(res.data))
       .catch(() => toast.error("Failed to load categories"));
   }, []);
@@ -112,8 +110,6 @@ export default function AddProductPage() {
   //
   const onSubmit = async (data: ProductForm) => {
     try {
-      setLoading(true);
-
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("categoryId", data.categoryId);
@@ -128,7 +124,7 @@ export default function AddProductPage() {
       formData.append("productNumber", generatedCodes.productNumber);
       if (photo) formData.append("photo", photo);
 
-      const res = await axios.post("/products", formData, {
+      const res = await axios.post("/api/products", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -139,8 +135,6 @@ export default function AddProductPage() {
       router.push("/products");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to add product");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -283,18 +277,9 @@ export default function AddProductPage() {
           <motion.button
             type="submit"
             whileTap={{ scale: 0.97 }}
-            disabled={loading}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-medium shadow-lg mt-4"
           >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" /> Saving...
-              </>
-            ) : (
-              <>
-                <Package /> Add Product
-              </>
-            )}
+            <Package /> Add Product
           </motion.button>
         </form>
       </motion.div>
