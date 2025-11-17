@@ -118,48 +118,94 @@ export const getProductById = async (req, res) => {
 -------------------------------------------------------- */
 export const updateProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const id = req.params.id;
+    // validate product id
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product id" });
+    }
+
+    const product = await Product.findById(id);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const body = req.body;
+    const body = req.body || {};
 
-    // keep old photos unless overridden
-    let existingPhotos = product.photos || [];
+    // --- SAFE categoryId handling ---
+    let categoryId = body.categoryId;
+    // treat empty strings or "null"/"undefined" as no-category
+    if (
+      !categoryId ||
+      categoryId === "" ||
+      categoryId === "null" ||
+      categoryId === "undefined"
+    ) {
+      categoryId = null;
+    } else if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      // invalid ObjectId string -> reject or set to null (here we set to null to be forgiving)
+      categoryId = null;
+    } else {
+      // convert to ObjectId
+      categoryId = mongoose.Types.ObjectId(categoryId);
+    }
 
-    // Handle clearPhotos flag
-    if (body.clearPhotos === "1") {
+    // --- Numeric cast helpers (only if present) ---
+    const maybeNumber = (val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      const n = Number(val);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const updates = {};
+
+    if (body.name !== undefined) updates.name = String(body.name).trim();
+    // categoryId: set either ObjectId or null (explicit)
+    updates.categoryId = categoryId; // will set to null or ObjectId
+    const sp = maybeNumber(body.sellingPrice);
+    if (sp !== undefined) updates.sellingPrice = sp;
+    const cp = maybeNumber(body.costPrice);
+    if (cp !== undefined) updates.costPrice = cp;
+    const wp = maybeNumber(body.wholesalePrice);
+    if (wp !== undefined) updates.wholesalePrice = wp;
+    const st = maybeNumber(body.stock);
+    if (st !== undefined) updates.stock = st;
+    if (body.unit !== undefined) updates.unit = body.unit;
+    if (body.sku !== undefined) updates.sku = body.sku;
+
+    // --- Handle photos ---
+    // existing photos (array of urls) from DB
+    let existingPhotos = Array.isArray(product.photos)
+      ? product.photos.slice()
+      : product.photo
+      ? [product.photo]
+      : [];
+
+    // clearPhotos flag (frontend sends "clearPhotos": "1")
+    if (
+      body.clearPhotos === "1" ||
+      body.clearPhotos === 1 ||
+      body.clearPhotos === true
+    ) {
       existingPhotos = [];
     }
 
-    // Upload new images
-    let newPhotos = [];
-    if (req.files && req.files.length > 0) {
-      newPhotos = req.files.map((file) => file.path);
-    }
+    // newly uploaded files (CloudinaryStorage gives file.path)
+    const newPhotos =
+      Array.isArray(req.files) && req.files.length > 0
+        ? req.files.map((f) => f.path)
+        : [];
 
-    // Final merged photos
-    const updatedPhotos = [...existingPhotos, ...newPhotos];
+    // Merge: keep existingPhotos and append newPhotos
+    const mergedPhotos = [...existingPhotos, ...newPhotos];
 
-    const updated = await Product.findByIdAndUpdate(
-      req.params.id,
-      {
-        name: body.name,
-        categoryId: body.categoryId,
-        sellingPrice: body.sellingPrice,
-        costPrice: body.costPrice,
-        wholesalePrice: body.wholesalePrice,
-        stock: body.stock,
-        unit: body.unit,
-        sku: body.sku,
-        photos: updatedPhotos,
-      },
-      { new: true }
-    );
+    // Only set photos field if there is value (could be empty array intentionally)
+    updates.photos = mergedPhotos;
 
-    res.status(200).json(updated);
+    // Perform update
+    const updated = await Product.findByIdAndUpdate(id, updates, { new: true });
+
+    return res.status(200).json(updated);
   } catch (error) {
     console.error("❌ updateProduct error:", error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
