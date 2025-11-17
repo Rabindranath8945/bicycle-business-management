@@ -27,7 +27,7 @@ const ProductSchema = new mongoose.Schema(
     hsn: { type: String },
     sku: { type: String },
     barcode: { type: String },
-    productNumber: { type: String },
+    productNumber: { type: String, unique: true },
 
     // photo URL
     photo: { type: String },

@@ -33,27 +33,27 @@ export const createProduct = async (req, res) => {
       hsn,
     } = req.body;
 
-    // 🛑 Validate required fields
+    // 🛑 Required fields check
     if (!name || !sellingPrice || !costPrice) {
       return res.status(400).json({
         message: "name, sellingPrice and costPrice are required.",
       });
     }
 
-    // 🧭 Find category (optional)
+    // 🧭 Fetch category (if provided)
     const categoryData = categoryId
       ? await Category.findById(categoryId)
       : null;
 
     const categoryName = categoryData ? categoryData.name : "Uncategorized";
 
-    // 🧩 Auto fields
-    const productNumber = generateProductNumber();
+    // 🧩 Auto-generated fields
+    const productNumber = await generateProductNumber(Product); // <-- FIXED
     const sku = generateSKU(categoryName);
     const barcode = generateBarcode();
     const auto_hsn = hsn || autoHSN(categoryName);
 
-    // 📸 Photo (cloudinary or local)
+    // 📸 Photo (Cloudinary or local)
     const photo = req.file ? req.file.path : req.body.photo || null;
 
     // ✅ Create product
@@ -68,7 +68,7 @@ export const createProduct = async (req, res) => {
       hsn: auto_hsn,
       sku,
       barcode,
-      productNumber,
+      productNumber, // unique
       photo,
     });
 

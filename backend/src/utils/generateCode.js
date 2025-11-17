@@ -17,10 +17,29 @@ export const generateSKU = (categoryName = "GEN") => {
 
 // ✅ Generate Product Number: PRD + Date + Counter
 // Example: PRD20251112-001
-export const generateProductNumber = (counter = 1) => {
+export const generateProductNumber = async (Product) => {
   const date = new Date();
-  const formattedDate = `${date.getFullYear()}${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-  return `PRD${formattedDate}-${String(counter).padStart(3, "0")}`;
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  const datePrefix = `PRD${yyyy}${mm}${dd}`;
+
+  // Find last product created today
+  const lastProduct = await Product.findOne(
+    { productNumber: { $regex: `^${datePrefix}` } },
+    { productNumber: 1 }
+  )
+    .sort({ productNumber: -1 })
+    .lean();
+
+  let nextNumber = 1;
+
+  if (lastProduct) {
+    // Extract last suffix
+    const lastSuffix = parseInt(lastProduct.productNumber.split("-")[1], 10);
+    nextNumber = lastSuffix + 1;
+  }
+
+  return `${datePrefix}-${String(nextNumber).padStart(3, "0")}`;
 };
