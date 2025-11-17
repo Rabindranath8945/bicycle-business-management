@@ -33,30 +33,25 @@ export const createProduct = async (req, res) => {
       hsn,
     } = req.body;
 
-    // 🛑 Required fields check
     if (!name || !sellingPrice || !costPrice) {
       return res.status(400).json({
         message: "name, sellingPrice and costPrice are required.",
       });
     }
 
-    // 🧭 Fetch category (if provided)
     const categoryData = categoryId
       ? await Category.findById(categoryId)
       : null;
-
     const categoryName = categoryData ? categoryData.name : "Uncategorized";
 
-    // 🧩 Auto-generated fields
-    const productNumber = await generateProductNumber(Product); // <-- FIXED
+    const productNumber = await generateProductNumber(Product);
     const sku = generateSKU(categoryName);
     const barcode = generateBarcode();
     const auto_hsn = hsn || autoHSN(categoryName);
 
-    // 📸 Photo (Cloudinary or local)
-    const photo = req.file ? req.file.path : req.body.photo || null;
+    // MULTIPLE PHOTOS
+    const photos = req.files?.map((file) => file.path) || [];
 
-    // ✅ Create product
     const product = await Product.create({
       name,
       categoryId: categoryData ? categoryData._id : null,
@@ -68,14 +63,14 @@ export const createProduct = async (req, res) => {
       hsn: auto_hsn,
       sku,
       barcode,
-      productNumber, // unique
-      photo,
+      productNumber,
+      photos,
     });
 
     res.status(201).json(product);
-  } catch (error) {
-    console.error("❌ createProduct error:", error);
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("❌ createProduct error:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -126,18 +121,44 @@ export const updateProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const updatedData = { ...req.body };
+    const body = req.body;
 
-    if (req.file) updatedData.photo = req.file.path;
+    // keep old photos unless overridden
+    let existingPhotos = product.photos || [];
+
+    // Handle clearPhotos flag
+    if (body.clearPhotos === "1") {
+      existingPhotos = [];
+    }
+
+    // Upload new images
+    let newPhotos = [];
+    if (req.files && req.files.length > 0) {
+      newPhotos = req.files.map((file) => file.path);
+    }
+
+    // Final merged photos
+    const updatedPhotos = [...existingPhotos, ...newPhotos];
 
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
-      updatedData,
+      {
+        name: body.name,
+        categoryId: body.categoryId,
+        sellingPrice: body.sellingPrice,
+        costPrice: body.costPrice,
+        wholesalePrice: body.wholesalePrice,
+        stock: body.stock,
+        unit: body.unit,
+        sku: body.sku,
+        photos: updatedPhotos,
+      },
       { new: true }
     );
 
     res.status(200).json(updated);
   } catch (error) {
+    console.error("❌ updateProduct error:", error);
     res.status(500).json({ message: error.message });
   }
 };
