@@ -20,26 +20,33 @@ const app = express();
 
 /* ✅ Proper CORS Setup */
 /* ✅ Allow localhost + production frontend */
-const allowedOrigins = ["http://localhost:3000", /\.vercel\.app$/];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin: (origin, callback) => {
+      // 1. Server-to-server / mobile / curl (no origin)
       if (!origin) return callback(null, true);
 
-      if (
-        allowedOrigins.some((o) =>
-          o instanceof RegExp ? o.test(origin) : o === origin
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.log("❌ BLOCKED CORS:", origin);
-        callback(new Error("Not allowed by CORS"));
-      }
+      // 2. Local development
+      if (origin.startsWith("http://localhost")) return callback(null, true);
+
+      // 3. Allow ANY Vercel deployment (*.vercel.app)
+      if (origin.endsWith(".vercel.app")) return callback(null, true);
+
+      // 4. Allow Render internal calls
+      if (origin.includes("onrender.com")) return callback(null, true);
+
+      // 5. Block everything else
+      console.log("❌ BLOCKED CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
     },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// // Handle ALL preflight requests
+// app.options("*", cors());
 
 app.use(express.json());
 app.use(morgan("dev"));
