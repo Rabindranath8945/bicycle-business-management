@@ -20,26 +20,24 @@ const app = express();
 
 /* ✅ Proper CORS Setup */
 /* ✅ Allow localhost + production frontend */
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://bicycle-pos.vercel.app",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+const allowedOrigins = ["http://localhost:3000", /\.vercel\.app$/];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (e.g. Postman)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+      if (
+        allowedOrigins.some((o) =>
+          o instanceof RegExp ? o.test(origin) : o === origin
+        )
+      ) {
+        callback(null, true);
       } else {
         console.log("❌ BLOCKED CORS:", origin);
-        return callback(new Error("Not allowed by CORS"));
+        callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true,
   })
 );
 
