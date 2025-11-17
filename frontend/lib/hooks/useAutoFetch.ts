@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import axios from "@/lib/axiosInstance";
+import axios from "@/lib/axios";
 import { usePathname } from "next/navigation";
 
 const routeToEndpointMap: Record<string, string> = {

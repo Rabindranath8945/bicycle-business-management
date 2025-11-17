@@ -2,6 +2,7 @@ import "./globals.css";
 import { LayoutProvider } from "@/components/layout/LayoutContext";
 import ClientLayout from "@/components/layout/ClientLayout"; // 👈 new client wrapper
 import { Toaster } from "sonner";
+// import { AuthProvider } from "@/lib/context/AuthContext";
 
 export const metadata = {
   title: "Bicycle POS & Accounting Dashboard",

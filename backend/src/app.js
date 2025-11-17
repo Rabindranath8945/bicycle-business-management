@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import productRoutes from "./routes/productRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import saleRoutes from "./routes/saleRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
@@ -23,7 +23,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "https://bicycle-pos.vercel.app",
-  process.env.FRONTEND_URL, // optional
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
@@ -50,7 +50,7 @@ app.use(cookieParser());
 /* Routes */
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/users", authRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/suppliers", supplierRoutes);

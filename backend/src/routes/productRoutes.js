@@ -9,6 +9,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "../controllers/productController.js";
+import Product from "../models/Product.js";
 
 const router = express.Router();
 
@@ -25,7 +26,21 @@ const upload = multer({ storage });
 
 // Routes
 router.post("/", upload.single("photo"), createProduct);
-router.get("/", getProducts);
+router.get("/", async (req, res) => {
+  try {
+    const products = await Product.find().populate("categoryId", "name").lean();
+
+    return res.status(200).json(products);
+  } catch (error) {
+    console.error("GET /api/products ERROR:", error);
+    res.status(500).json({
+      message: "Server error in getProducts",
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
 router.get("/:id", getProductById);
 router.put("/:id", upload.single("photo"), updateProduct);
 router.delete("/:id", deleteProduct);

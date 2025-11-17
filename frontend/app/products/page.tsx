@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "@/lib/axiosInstance";
+import axios from "@/lib/axios";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -37,7 +37,7 @@ export default function ProductListPage() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const res = await axios.get("/products");
+        const res = await axios.get("/api/products");
         setProducts(res.data || []);
         setFiltered(res.data || []);
       } catch (err: any) {
@@ -91,7 +91,7 @@ export default function ProductListPage() {
           </p>
         </div>
         <Link
-          href="/products/new"
+          href="/api/products/new"
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg shadow-md transition"
         >
           <PlusCircle size={18} />
