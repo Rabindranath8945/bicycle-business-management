@@ -4,23 +4,18 @@ const categorySchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Category name is required"],
-      unique: true,
+      required: true,
       trim: true,
+      unique: true, // ❗ Prevent duplicates at database level
     },
     description: {
       type: String,
       default: "",
     },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
   },
   { timestamps: true }
 );
 
-const Category = mongoose.model("Category", categorySchema);
+categorySchema.index({ name: 1 }, { unique: true });
 
-export default Category;
+export default mongoose.model("Category", categorySchema);
