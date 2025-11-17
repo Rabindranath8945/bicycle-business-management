@@ -20,33 +20,27 @@ const app = express();
 
 /* ✅ Proper CORS Setup */
 /* ✅ Allow localhost + production frontend */
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://bicycle-datiuj2cl-rabindranath-mondals-projects.vercel.app",
+  "https://bicycle-pos.vercel.app", // optional if you rename
+];
+
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // 1. Server-to-server / mobile / curl (no origin)
-      if (!origin) return callback(null, true);
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow mobile / server requests
 
-      // 2. Local development
-      if (origin.startsWith("http://localhost")) return callback(null, true);
-
-      // 3. Allow ANY Vercel deployment (*.vercel.app)
-      if (origin.endsWith(".vercel.app")) return callback(null, true);
-
-      // 4. Allow Render internal calls
-      if (origin.includes("onrender.com")) return callback(null, true);
-
-      // 5. Block everything else
-      console.log("❌ BLOCKED CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log("❌ BLOCKED CORS:", origin);
+        callback(new Error("Not allowed by CORS"), false);
+      }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-// // Handle ALL preflight requests
-// app.options("*", cors());
 
 app.use(express.json());
 app.use(morgan("dev"));
