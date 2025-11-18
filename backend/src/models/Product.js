@@ -11,7 +11,7 @@ const ProductSchema = new mongoose.Schema(
       required: true,
     },
 
-    // for backward compatibility (string category name)
+    // legacy category name
     category: { type: String },
 
     // pricing
@@ -29,7 +29,7 @@ const ProductSchema = new mongoose.Schema(
     barcode: { type: String },
     productNumber: { type: String, unique: true },
 
-    // photo URL
+    // photo
     photo: { type: String },
     photos: [String],
   },
@@ -37,5 +37,12 @@ const ProductSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// ❌ remove duplicate indexes
+// If productNumber is unique, we define only one index:
+// ProductSchema.index({ productNumber: 1 }, { unique: true });
+
+// ❌ DO NOT create index on name here unless required
+// You had duplicate { name: 1 } index warnings.
 
 export default mongoose.model("Product", ProductSchema);

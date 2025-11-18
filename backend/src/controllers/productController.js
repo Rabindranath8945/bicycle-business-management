@@ -39,9 +39,11 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    const categoryData = categoryId
-      ? await Category.findById(categoryId)
-      : null;
+    let categoryData = null;
+    if (categoryId) {
+      categoryData = await Category.findById(categoryId);
+    }
+
     const categoryName = categoryData ? categoryData.name : "Uncategorized";
 
     const productNumber = await generateProductNumber(Product);
@@ -49,12 +51,12 @@ export const createProduct = async (req, res) => {
     const barcode = generateBarcode();
     const auto_hsn = hsn || autoHSN(categoryName);
 
-    // MULTIPLE PHOTOS
-    const photos = req.files?.map((file) => file.path) || [];
+    const photos = req.files?.map((f) => f.path) || [];
 
     const product = await Product.create({
       name,
-      categoryId: categoryData ? categoryData._id : null,
+      categoryId: categoryData?._id || null,
+      category: categoryName,
       sellingPrice,
       costPrice,
       wholesalePrice,
