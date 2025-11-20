@@ -68,7 +68,7 @@ export default function Header() {
 
   useEffect(() => {
     // try to fetch logged-in user info from backend
-    fetcher("/users/me")
+    fetcher("/api/users/me")
       .then((data) => setUser(data.user))
       .catch(() => setUser(null));
   }, []);

@@ -1,18 +1,30 @@
-import { verifyAccessToken } from "../utils/jwt.js";
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
-export default function authMiddleware(req, res, next) {
-  const auth = req.headers["authorization"];
-  if (!auth) return res.status(401).json({ message: "Not authenticated" });
-
-  const parts = auth.split(" ");
-  if (parts.length !== 2)
-    return res.status(401).json({ message: "Invalid token" });
-
+export const protect = async (req, res, next) => {
   try {
-    const payload = verifyAccessToken(parts[1]);
-    req.user = payload;
+    let token = null;
+
+    // From cookies
+    if (req.cookies?.token) {
+      token = req.cookies.token;
+    }
+
+    // From Authorization header
+    if (!token && req.headers.authorization?.startsWith("Bearer")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = await User.findById(decoded.id).select("-password");
+
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Token invalid or expired" });
+    return res.status(401).json({ message: "Not authorized" });
   }
-}
+};
