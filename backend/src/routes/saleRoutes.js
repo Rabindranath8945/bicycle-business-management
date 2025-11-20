@@ -1,14 +1,16 @@
 import express from "express";
 import {
-  addSale,
-  getSales,
+  createSale,
+  listSales,
   getSaleById,
+  downloadInvoicePDF,
 } from "../controllers/saleController.js";
 
 const router = express.Router();
 
-router.route("/").get(getSales).post(addSale);
-
-router.route("/:id").get(getSaleById);
+router.post("/", createSale);
+router.get("/", listSales);
+router.get("/:id", getSaleById);
+router.get("/:id/pdf", downloadInvoicePDF);
 
 export default router;

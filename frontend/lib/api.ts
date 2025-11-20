@@ -1,5 +1,5 @@
 // frontend/lib/api.ts
-export const API_BASE = "https://mandal-cycle-pos-api.onrender.com/";
+export const API_BASE = "https://mandal-cycle-pos-api.onrender.com";
 
 export async function fetcher(path: string, opts: RequestInit = {}) {
   const res = await fetch(API_BASE + path, {
