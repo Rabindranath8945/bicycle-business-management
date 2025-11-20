@@ -2,7 +2,7 @@ import "./globals.css";
 import { LayoutProvider } from "@/components/layout/LayoutContext";
 import ClientLayout from "@/components/layout/ClientLayout"; // 👈 new client wrapper
 import { Toaster } from "sonner";
-// import { AuthProvider } from "@/lib/context/AuthContext";
+import { AuthProvider } from "@/lib/context/AuthContext";
 
 export const metadata = {
   title: "Bicycle POS & Accounting Dashboard",
@@ -18,10 +18,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
         <LayoutProvider>
-          <ClientLayout>
-            <Toaster richColors position="top-right" />
-            {children}
-          </ClientLayout>
+          <AuthProvider>
+            <ClientLayout>
+              <Toaster richColors position="top-right" />
+              {children}
+            </ClientLayout>
+          </AuthProvider>
         </LayoutProvider>
       </body>
     </html>

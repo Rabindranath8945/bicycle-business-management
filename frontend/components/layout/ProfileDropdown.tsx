@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/lib/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiCog, HiLogout, HiUser } from "react-icons/hi";
@@ -13,6 +14,7 @@ interface ProfileDropdownProps {
 }
 
 export default function ProfileDropdown({ user }: ProfileDropdownProps) {
+  const { logout } = useAuth();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -115,15 +117,14 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
             </div>
 
             <div className="border-t border-slate-100 dark:border-slate-700">
-              <form method="post" action="/api/auth/logout">
-                <button
-                  type="submit"
-                  className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                >
-                  <HiLogout className="text-lg" />
-                  Logout
-                </button>
-              </form>
+              <button
+                type="submit"
+                onClick={logout}
+                className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+              >
+                <HiLogout className="text-lg" />
+                Logout
+              </button>
             </div>
           </motion.div>
         )}
