@@ -21,6 +21,9 @@ const autoHSN = (categoryName = "") => {
 /* --------------------------------------------------------
    ✔  CREATE PRODUCT
 -------------------------------------------------------- */
+// ------------------------------------------------------------
+// CLEAN, FINAL, FULLY FIXED createProduct
+// ------------------------------------------------------------
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -32,48 +35,71 @@ export const createProduct = async (req, res) => {
       stock,
       unit,
       hsn,
-    } = req.body;
-
-    if (!name || !sellingPrice || !costPrice) {
-      return res.status(400).json({
-        message: "name, sellingPrice and costPrice are required.",
-      });
-    }
-
-    let categoryData = null;
-    if (categoryId) {
-      categoryData = await Category.findById(categoryId);
-    }
-
-    const categoryName = categoryData ? categoryData.name : "Uncategorized";
-
-    const productNumber = await generateProductNumber(Product);
-    const sku = generateSKU(categoryName);
-    const barcode = generateBarcode();
-    const auto_hsn = hsn || autoHSN(categoryName);
-
-    const photos = req.files?.map((f) => f.path) || [];
-
-    const product = await Product.create({
-      name,
-      categoryId: categoryData?._id || null,
-      category: categoryName,
-      sellingPrice,
-      costPrice,
-      wholesalePrice,
-      stock,
-      unit,
-      hsn: auto_hsn,
       sku,
       barcode,
       productNumber,
-      photos,
+    } = req.body;
+
+    // Required fields
+    if (!name || !sellingPrice || !costPrice || !categoryId) {
+      return res.status(400).json({
+        message: "Name, Category, Selling Price, Cost Price are required.",
+      });
+    }
+
+    // ------------------------------------------------------------
+    // CATEGORY FIX
+    // ------------------------------------------------------------
+    let categoryName = "Uncategorized";
+
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      const catData = await Category.findById(categoryId);
+      if (catData) categoryName = catData.name;
+    }
+
+    // ------------------------------------------------------------
+    // PHOTO UPLOAD FIX
+    // ------------------------------------------------------------
+    let photos = [];
+
+    // If multiple photos uploaded: req.files
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      photos = req.files.map((f) => f.path);
+    }
+
+    // If single photo uploaded: req.file (rare case, support anyway)
+    if (req.file) {
+      photos.push(req.file.path);
+    }
+
+    // ------------------------------------------------------------
+    // CREATE PRODUCT
+    // ------------------------------------------------------------
+    const product = await Product.create({
+      name,
+      categoryId,
+      category: categoryName,
+
+      sellingPrice: Number(sellingPrice),
+      costPrice: Number(costPrice),
+      wholesalePrice: Number(wholesalePrice) || 0,
+
+      stock: Number(stock),
+      unit,
+      hsn,
+
+      sku,
+      barcode,
+      productNumber,
+
+      photos, // array of photos
+      photo: photos[0] || null, // backward compatibility
     });
 
-    res.status(201).json(product);
-  } catch (err) {
-    console.error("❌ createProduct error:", err);
-    res.status(500).json({ message: err.message });
+    return res.status(201).json(product);
+  } catch (error) {
+    console.error("❌ createProduct error:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 

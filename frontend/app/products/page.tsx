@@ -73,11 +73,15 @@ export default function ProductListPage() {
   // Build list of categories from products
   const categories = useMemo(() => {
     const set = new Set<string>();
+
     products.forEach((p) => {
       const name =
-        typeof p.categoryId === "string" ? p.categoryId : p.categoryId?.name;
+        p.categoryName ??
+        (typeof p.categoryId === "string" ? "" : p.categoryId?.name);
+
       if (name) set.add(name);
     });
+
     return Array.from(set);
   }, [products]);
 
@@ -101,7 +105,9 @@ export default function ProductListPage() {
     if (selectedCategory) {
       out = out.filter((p) => {
         const name =
-          typeof p.categoryId === "string" ? p.categoryId : p.categoryId?.name;
+          p.categoryName ??
+          (typeof p.categoryId === "string" ? "" : p.categoryId?.name);
+
         return name === selectedCategory;
       });
     }
