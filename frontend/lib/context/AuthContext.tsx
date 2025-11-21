@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Login
   const login = async (email: string, password: string) => {
-    const res = await fetcher("/api/users/login", {
+    const res = await fetcher("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Logout
   const logout = async () => {
-    await fetcher("/api/users/logout", { method: "POST" });
+    await fetcher("/api/api/logout", { method: "POST" });
     setUser(null);
   };
 
