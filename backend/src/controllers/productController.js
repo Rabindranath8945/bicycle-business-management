@@ -110,67 +110,75 @@ export const getProductById = async (req, res) => {
 -------------------------------------------------------- */
 export const updateProduct = async (req, res) => {
   try {
-    const id = req.params.id;
-    // validate product id
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid product id" });
+    const productId = req.params.id;
+
+    // validate ID
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findById(id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    // find product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
     const body = req.body || {};
+    const updates = {};
 
-    // --- SAFE categoryId handling ---
+    // ------------ CATEGORY HANDLING (SAFE) ------------
     let categoryId = body.categoryId;
-    // treat empty strings or "null"/"undefined" as no-category
+
+    // Normalize empty/unusable values
     if (
       !categoryId ||
       categoryId === "" ||
       categoryId === "null" ||
       categoryId === "undefined"
     ) {
-      categoryId = null;
-    } else if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-      // invalid ObjectId string -> reject or set to null (here we set to null to be forgiving)
-      categoryId = null;
+      updates.categoryId = null;
+    } else if (mongoose.Types.ObjectId.isValid(categoryId)) {
+      updates.categoryId = categoryId; // Mongoose will auto-cast
     } else {
-      // convert to ObjectId
-      categoryId = mongoose.Types.ObjectId(categoryId);
+      updates.categoryId = null; // fallback
     }
 
-    // --- Numeric cast helpers (only if present) ---
-    const maybeNumber = (val) => {
-      if (val === undefined || val === null || val === "") return undefined;
-      const n = Number(val);
+    // ------------ BASIC STRING FIELDS ------------
+
+    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.unit !== undefined) updates.unit = String(body.unit).trim();
+    if (body.sku !== undefined) updates.sku = String(body.sku).trim();
+    if (body.category !== undefined) updates.category = String(body.category);
+
+    // ------------ NUMERIC FIELDS (SAFE CAST) ------------
+    const castNum = (v) => {
+      if (v === undefined || v === null || v === "") return undefined;
+      const n = Number(v);
       return Number.isFinite(n) ? n : undefined;
     };
 
-    const updates = {};
-
-    if (body.name !== undefined) updates.name = String(body.name).trim();
-    // categoryId: set either ObjectId or null (explicit)
-    updates.categoryId = categoryId; // will set to null or ObjectId
-    const sp = maybeNumber(body.sellingPrice);
+    const sp = castNum(body.sellingPrice);
     if (sp !== undefined) updates.sellingPrice = sp;
-    const cp = maybeNumber(body.costPrice);
-    if (cp !== undefined) updates.costPrice = cp;
-    const wp = maybeNumber(body.wholesalePrice);
-    if (wp !== undefined) updates.wholesalePrice = wp;
-    const st = maybeNumber(body.stock);
-    if (st !== undefined) updates.stock = st;
-    if (body.unit !== undefined) updates.unit = body.unit;
-    if (body.sku !== undefined) updates.sku = body.sku;
 
-    // --- Handle photos ---
-    // existing photos (array of urls) from DB
+    const cp = castNum(body.costPrice);
+    if (cp !== undefined) updates.costPrice = cp;
+
+    const wp = castNum(body.wholesalePrice);
+    if (wp !== undefined) updates.wholesalePrice = wp;
+
+    const st = castNum(body.stock);
+    if (st !== undefined) updates.stock = st;
+
+    // ------------ HSN ------------
+
+    if (body.hsn !== undefined) updates.hsn = String(body.hsn).trim();
+
+    // ------------ PHOTOS HANDLING ------------
     let existingPhotos = Array.isArray(product.photos)
-      ? product.photos.slice()
-      : product.photo
-      ? [product.photo]
+      ? [...product.photos]
       : [];
 
-    // clearPhotos flag (frontend sends "clearPhotos": "1")
+    // If "clearPhotos" flag sent → wipe existing photos
     if (
       body.clearPhotos === "1" ||
       body.clearPhotos === 1 ||
@@ -179,20 +187,19 @@ export const updateProduct = async (req, res) => {
       existingPhotos = [];
     }
 
-    // newly uploaded files (CloudinaryStorage gives file.path)
+    // New uploaded files (via multer/cloudinary)
     const newPhotos =
       Array.isArray(req.files) && req.files.length > 0
         ? req.files.map((f) => f.path)
         : [];
 
-    // Merge: keep existingPhotos and append newPhotos
-    const mergedPhotos = [...existingPhotos, ...newPhotos];
+    // Merge old + new
+    updates.photos = [...existingPhotos, ...newPhotos];
 
-    // Only set photos field if there is value (could be empty array intentionally)
-    updates.photos = mergedPhotos;
-
-    // Perform update
-    const updated = await Product.findByIdAndUpdate(id, updates, { new: true });
+    // ------------ APPLY UPDATE ------------
+    const updated = await Product.findByIdAndUpdate(productId, updates, {
+      new: true,
+    });
 
     return res.status(200).json(updated);
   } catch (error) {
