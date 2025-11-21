@@ -1,13 +1,20 @@
 export const API_BASE = "https://mandal-cycle-pos-api.onrender.com";
 
 export async function fetcher(path: string, opts: RequestInit = {}) {
-  // ensure the path ALWAYS begins with '/'
   const cleanPath = path.startsWith("/") ? path : "/" + path;
 
+  const headers: Record<string, string> = {};
+  if (opts.method && opts.method !== "GET") {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(API_BASE + cleanPath, {
-    headers: { "Content-Type": "application/json" },
     credentials: "include",
     ...opts,
+    headers: {
+      ...headers,
+      ...(opts.headers || {}),
+    },
   });
 
   if (!res.ok) {
