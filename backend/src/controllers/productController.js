@@ -83,10 +83,31 @@ export const createProduct = async (req, res) => {
 -------------------------------------------------------- */
 export const getProducts = async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 }).lean();
-    return res.status(200).json(products);
-  } catch (error) {
-    console.error("❌ getProducts error:", error);
+    const products = await Product.find()
+      .populate("categoryId", "name") // GET CATEGORY NAME
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formatted = products.map((p) => ({
+      _id: p._id,
+      name: p.name,
+      productNumber: p.productNumber,
+      sku: p.sku,
+      categoryId: p.categoryId?._id || null,
+      categoryName: p.categoryId?.name || "Uncategorized",
+      sellingPrice: p.sellingPrice,
+      costPrice: p.costPrice,
+      wholesalePrice: p.wholesalePrice,
+      stock: p.stock,
+      hsn: p.hsn,
+      barcode: p.barcode,
+      photo: p.photo,
+      photos: p.photos || [],
+    }));
+
+    return res.status(200).json(formatted);
+  } catch (err) {
+    console.error("❌ getProducts error:", err);
     return res.status(500).json({ message: "Server error in getProducts" });
   }
 };
@@ -110,96 +131,94 @@ export const getProductById = async (req, res) => {
 -------------------------------------------------------- */
 export const updateProduct = async (req, res) => {
   try {
-    const productId = req.params.id;
+    const id = req.params.id;
 
-    // validate ID
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
+    // Validate product ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    // find product
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    let product = await Product.findById(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const body = req.body || {};
-    const updates = {};
+    const body = req.body;
 
-    // ------------ CATEGORY HANDLING (SAFE) ------------
+    // -------------------------------------------------------------
+    // CATEGORY FIX
+    // -------------------------------------------------------------
     let categoryId = body.categoryId;
 
-    // Normalize empty/unusable values
     if (
       !categoryId ||
-      categoryId === "" ||
       categoryId === "null" ||
-      categoryId === "undefined"
+      categoryId === "undefined" ||
+      categoryId === ""
     ) {
-      updates.categoryId = null;
-    } else if (mongoose.Types.ObjectId.isValid(categoryId)) {
-      updates.categoryId = categoryId; // Mongoose will auto-cast
-    } else {
-      updates.categoryId = null; // fallback
+      categoryId = null;
+    } else if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      categoryId = null;
     }
 
-    // ------------ BASIC STRING FIELDS ------------
+    let categoryName = product.category; // default old category name
 
-    if (body.name !== undefined) updates.name = String(body.name).trim();
-    if (body.unit !== undefined) updates.unit = String(body.unit).trim();
-    if (body.sku !== undefined) updates.sku = String(body.sku).trim();
-    if (body.category !== undefined) updates.category = String(body.category);
+    if (categoryId) {
+      const catData = await Category.findById(categoryId);
+      if (catData) categoryName = catData.name;
+    } else {
+      categoryName = "Uncategorized";
+    }
 
-    // ------------ NUMERIC FIELDS (SAFE CAST) ------------
+    // -------------------------------------------------------------
+    // PHOTO FIX
+    // -------------------------------------------------------------
+    let existingPhotos = [];
+
+    if (Array.isArray(product.photos)) existingPhotos = [...product.photos];
+    if (product.photo) existingPhotos.push(product.photo); // legacy field
+
+    // clearPhotos flag
+    if (body.clearPhotos == "1") {
+      existingPhotos = [];
+    }
+
+    // new uploaded photos
+    const newPhotos =
+      Array.isArray(req.files) && req.files.length > 0
+        ? req.files.map((f) => f.path)
+        : [];
+
+    const finalPhotos = [...existingPhotos, ...newPhotos];
+
+    // -------------------------------------------------------------
+    // NUMERIC FIELDS FIX
+    // -------------------------------------------------------------
     const castNum = (v) => {
       if (v === undefined || v === null || v === "") return undefined;
       const n = Number(v);
       return Number.isFinite(n) ? n : undefined;
     };
 
-    const sp = castNum(body.sellingPrice);
-    if (sp !== undefined) updates.sellingPrice = sp;
+    // -------------------------------------------------------------
+    // UPDATE OBJECT
+    // -------------------------------------------------------------
+    const updates = {
+      name: body.name ?? product.name,
+      categoryId: categoryId,
+      category: categoryName,
+      sellingPrice: castNum(body.sellingPrice) ?? product.sellingPrice,
+      costPrice: castNum(body.costPrice) ?? product.costPrice,
+      wholesalePrice: castNum(body.wholesalePrice) ?? product.wholesalePrice,
+      stock: castNum(body.stock) ?? product.stock,
+      unit: body.unit ?? product.unit,
+      hsn: body.hsn ?? product.hsn,
+      sku: body.sku ?? product.sku,
+      photos: finalPhotos,
+    };
 
-    const cp = castNum(body.costPrice);
-    if (cp !== undefined) updates.costPrice = cp;
-
-    const wp = castNum(body.wholesalePrice);
-    if (wp !== undefined) updates.wholesalePrice = wp;
-
-    const st = castNum(body.stock);
-    if (st !== undefined) updates.stock = st;
-
-    // ------------ HSN ------------
-
-    if (body.hsn !== undefined) updates.hsn = String(body.hsn).trim();
-
-    // ------------ PHOTOS HANDLING ------------
-    let existingPhotos = Array.isArray(product.photos)
-      ? [...product.photos]
-      : [];
-
-    // If "clearPhotos" flag sent → wipe existing photos
-    if (
-      body.clearPhotos === "1" ||
-      body.clearPhotos === 1 ||
-      body.clearPhotos === true
-    ) {
-      existingPhotos = [];
-    }
-
-    // New uploaded files (via multer/cloudinary)
-    const newPhotos =
-      Array.isArray(req.files) && req.files.length > 0
-        ? req.files.map((f) => f.path)
-        : [];
-
-    // Merge old + new
-    updates.photos = [...existingPhotos, ...newPhotos];
-
-    // ------------ APPLY UPDATE ------------
-    const updated = await Product.findByIdAndUpdate(productId, updates, {
-      new: true,
-    });
+    // -------------------------------------------------------------
+    // UPDATE PRODUCT
+    // -------------------------------------------------------------
+    const updated = await Product.findByIdAndUpdate(id, updates, { new: true });
 
     return res.status(200).json(updated);
   } catch (error) {
