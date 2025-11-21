@@ -82,22 +82,13 @@ export const createProduct = async (req, res) => {
    🔥 FIXED strictPopulateError → removed populate
 -------------------------------------------------------- */
 export const getProducts = async (req, res) => {
+  console.log("Product schema on Render:", Object.keys(Product.schema.paths));
   try {
     const products = await Product.find().sort({ createdAt: -1 }).lean();
-
-    const formatted = products.map((p) => ({
-      _id: p._id,
-      name: p.name,
-      categoryId: p.categoryId || null,
-      price: p.sellingPrice ?? 0,
-      stock: p.stock ?? 0,
-      hsn: p.hsn || "N/A",
-      createdAt: p.createdAt,
-    }));
-
     return res.status(200).json(formatted);
   } catch (error) {
     console.error("❌ getProducts error:", error);
+
     res.status(500).json({ message: "Server error in getProducts" });
   }
 };
