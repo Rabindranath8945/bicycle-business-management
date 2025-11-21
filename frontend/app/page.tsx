@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<any>(null);
 
   useEffect(() => {
-    fetcher("/reports/dashboard")
+    fetcher("/api/reports/dashboard")
       .then((res) => setSummary(res))
       .catch(() =>
         setSummary({
