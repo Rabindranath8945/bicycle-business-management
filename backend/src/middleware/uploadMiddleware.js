@@ -11,10 +11,12 @@ cloudinary.config({
 // ********** STORAGE **********
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
+  params: async (req, file) => ({
     folder: "products",
+    format: "jpg", // convert to jpg always
     allowed_formats: ["jpg", "jpeg", "png", "webp"],
-  },
+    public_id: `prod_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+  }),
 });
 
 // ********** MULTER **********

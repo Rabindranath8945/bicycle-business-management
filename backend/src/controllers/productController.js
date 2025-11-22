@@ -41,9 +41,34 @@ export const createProduct = async (req, res) => {
     const cat = await Category.findById(categoryId);
     if (cat) categoryName = cat.name;
 
-    // Photos from Cloudinary
-    let photos = [];
-    if (Array.isArray(req.files)) photos = req.files.map((f) => f.path);
+    // incoming req.files when using upload.fields will be an object like:
+    // { photo: [file1,...], photos: [file1,...] }
+
+    let filesArr = [];
+
+    // when using upload.fields:
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        // unlikely with upload.fields, but handle it
+        filesArr = req.files.map((f) => f.path);
+      } else {
+        // object with keys
+        const arr1 = Array.isArray(req.files.photo)
+          ? req.files.photo.map((f) => f.path)
+          : [];
+        const arr2 = Array.isArray(req.files.photos)
+          ? req.files.photos.map((f) => f.path)
+          : [];
+        filesArr = [...arr1, ...arr2];
+      }
+    }
+
+    // If using single upload (req.file):
+    if (req.file && req.file.path) {
+      filesArr.push(req.file.path);
+    }
+
+    // now filesArr contains cloudinary urls (or local paths)
 
     // Auto-generate codes
     const sku = generateSKU(categoryName);
@@ -152,11 +177,34 @@ export const updateProduct = async (req, res) => {
 
     // Handle clear photos
     if (req.body.clearPhotos === "1") product.photos = [];
+    // incoming req.files when using upload.fields will be an object like:
+    // { photo: [file1,...], photos: [file1,...] }
 
-    // Add new photos
-    if (req.files?.length > 0) {
-      product.photos = [...product.photos, ...req.files.map((f) => f.path)];
+    let filesArr = [];
+
+    // when using upload.fields:
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        // unlikely with upload.fields, but handle it
+        filesArr = req.files.map((f) => f.path);
+      } else {
+        // object with keys
+        const arr1 = Array.isArray(req.files.photo)
+          ? req.files.photo.map((f) => f.path)
+          : [];
+        const arr2 = Array.isArray(req.files.photos)
+          ? req.files.photos.map((f) => f.path)
+          : [];
+        filesArr = [...arr1, ...arr2];
+      }
     }
+
+    // If using single upload (req.file):
+    if (req.file && req.file.path) {
+      filesArr.push(req.file.path);
+    }
+
+    // now filesArr contains cloudinary urls (or local paths)
 
     product.photo = product.photos[0] || null;
 
