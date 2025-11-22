@@ -6,9 +6,9 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
-  searchProducts,
   getProductByBarcode,
 } from "../controllers/productController.js";
+import { searchProducts } from "../controllers/productController.js";
 
 const router = express.Router();
 

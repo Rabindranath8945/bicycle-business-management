@@ -14,6 +14,7 @@ import expenseRoutes from "./routes/expenseRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -58,6 +59,7 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/accounting", accountRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.get("/", (req, res) => {
   res.send("🚴 Bicycle Business Management API is running...");
