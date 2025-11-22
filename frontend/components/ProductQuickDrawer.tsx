@@ -9,9 +9,10 @@ import { toast } from "sonner";
 type Product = {
   _id: string;
   name: string;
+  salePrice: number;
+  category?: { _id: string; name: string };
   categoryName?: string;
   stock?: number;
-  salePrice: number;
   costPrice?: number;
   photo?: string | null;
   hsn?: string;
@@ -43,14 +44,17 @@ export default function ProductQuickDrawer({
     try {
       const res = await axios.patch(`/api/products/${local._id}`, {
         name: local.name,
-        salePrice: local.salePrice,
+        sellingPrice: local.salePrice, // FIXED
         stock: local.stock,
         costPrice: local.costPrice,
+        hsn: local.hsn,
         active: local.active,
+        // ensure category is provided
+        category: product.category?._id || undefined,
       });
-      onSave(res.data);
-    } catch (err) {
-      toast.error("Save failed");
+      onSave(res.data.product);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Save failed");
     }
   };
 

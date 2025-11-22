@@ -35,6 +35,9 @@ const productSchema = z.object({
 type ProductForm = z.infer<typeof productSchema>;
 
 export default function AddProductPage() {
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const router = useRouter();
   const [categories, setCategories] = useState<any[]>([]);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -137,7 +140,7 @@ export default function AddProductPage() {
     try {
       const formData = new FormData();
       formData.append("name", data.name);
-      formData.append("categoryId", data.categoryId);
+      formData.append("category", data.categoryId);
       formData.append("sellingPrice", data.sellingPrice);
       formData.append("costPrice", data.costPrice);
       formData.append("wholesalePrice", data.wholesalePrice || "");
@@ -156,6 +159,12 @@ export default function AddProductPage() {
 
       await axios.post("/api/products", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (p: any) => {
+          const total = p.total || p.loaded; // fallback
+          const percent = Math.round((p.loaded * 100) / total);
+          setUploading(true);
+          setUploadProgress(percent);
+        },
       });
 
       toast.success("✅ Product added successfully!");
@@ -322,6 +331,21 @@ export default function AddProductPage() {
               </div>
             )}
           </div>
+          {/* 🔥 Upload Progress (PUT IT HERE) */}
+          {uploading && (
+            <div className="mt-4">
+              <div className="w-full bg-slate-800 h-2 rounded-lg overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-2 transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+
+              <p className="text-xs text-slate-400 mt-1">
+                Uploading image… {uploadProgress}%
+              </p>
+            </div>
+          )}
 
           {/* Submit */}
           <motion.button
