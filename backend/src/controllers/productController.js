@@ -24,72 +24,42 @@ export const createProduct = async (req, res) => {
   try {
     const {
       name,
-      categoryId,
+      category,
       sellingPrice,
       costPrice,
       wholesalePrice,
       stock,
-      unit,
+      sku,
       hsn,
     } = req.body;
 
-    if (!name || !categoryId || !sellingPrice || !costPrice)
-      return res.status(400).json({ message: "Missing required fields" });
-
-    // Fetch category name
-    let categoryName = "Uncategorized";
-    const cat = await Category.findById(categoryId);
-    if (cat) categoryName = cat.name;
-
-    // Gather uploaded files
-    let filesArr = [];
-
-    if (req.files) {
-      if (Array.isArray(req.files)) {
-        filesArr = req.files.map((f) => f.path);
-      } else {
-        const arr1 = Array.isArray(req.files.photo)
-          ? req.files.photo.map((f) => f.path)
-          : [];
-        const arr2 = Array.isArray(req.files.photos)
-          ? req.files.photos.map((f) => f.path)
-          : [];
-        filesArr = [...arr1, ...arr2];
-      }
+    if (!name || !sellingPrice || !category) {
+      return res.status(400).json({ message: "Required fields missing" });
     }
 
-    if (req.file?.path) {
-      filesArr.push(req.file.path);
-    }
-
-    // Generate codes
-    const sku = generateSKU(categoryName);
-    const barcode = generateBarcode();
-    const productNumber = await generateProductNumber(Product);
-    const auto_hsn = hsn || autoHSN(categoryName);
-
-    // SAVE PRODUCT (FIXED)
-    const created = await Product.create({
+    const product = new Product({
       name,
-      categoryId,
-      category: categoryName,
-      sellingPrice,
-      costPrice,
-      wholesalePrice: wholesalePrice || 0,
-      stock,
-      unit,
-      hsn: auto_hsn,
+      category,
+      salePrice: Number(sellingPrice),
+      costPrice: Number(costPrice || 0),
+      wholesalePrice: Number(wholesalePrice || 0),
+      stock: Number(stock || 0),
       sku,
-      barcode,
-      productNumber,
-      photos: filesArr, // FIXED
-      photo: filesArr[0] || null, // FIXED
+      hsn,
+      // photo gets added below if exists
     });
 
-    res.status(201).json(created);
+    // If a file is uploaded
+    if (req.file) {
+      product.photo = req.file.path; // Cloudinary URL
+    }
+
+    await product.save();
+
+    return res.json({ message: "Product created", product });
   } catch (err) {
-    console.error("❌ createProduct error:", err);
-    res.status(500).json({ message: err.message || "Server error" });
+    console.log("❌ CREATE PRODUCT ERROR:", err);
+    return res.status(500).json({ message: err.message });
   }
 };
 
@@ -138,72 +108,39 @@ export const getProductById = async (req, res) => {
 // ----------------------------------------------------------
 export const updateProduct = async (req, res) => {
   try {
-    const id = req.params.id;
-    const product = await Product.findById(id);
-    if (!product) return res.status(404).json({ message: "Not found" });
-
     const {
       name,
-      categoryId,
+      category,
       sellingPrice,
       costPrice,
       wholesalePrice,
       stock,
-      unit,
+      sku,
       hsn,
     } = req.body;
 
-    if (name) product.name = name;
-    if (categoryId) product.categoryId = categoryId;
-    if (sellingPrice) product.sellingPrice = sellingPrice;
-    if (costPrice) product.costPrice = costPrice;
-    if (wholesalePrice) product.wholesalePrice = wholesalePrice;
-    if (stock) product.stock = stock;
-    if (unit) product.unit = unit;
-    if (hsn) product.hsn = hsn;
+    const update = {
+      name,
+      category,
+      salePrice: Number(sellingPrice),
+      costPrice: Number(costPrice || 0),
+      wholesalePrice: Number(wholesalePrice || 0),
+      stock: Number(stock || 0),
+      sku,
+      hsn,
+    };
 
-    // Update category snapshot
-    if (categoryId) {
-      const cat = await Category.findById(categoryId);
-      product.category = cat?.name || product.category;
+    if (req.file) {
+      update.photo = req.file.path;
     }
 
-    // Handle clear photos
-    if (req.body.clearPhotos === "1") product.photos = [];
-    // incoming req.files when using upload.fields will be an object like:
-    // { photo: [file1,...], photos: [file1,...] }
+    const updated = await Product.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+    });
 
-    let filesArr = [];
-
-    // when using upload.fields:
-    if (req.files) {
-      if (Array.isArray(req.files)) {
-        // unlikely with upload.fields, but handle it
-        filesArr = req.files.map((f) => f.path);
-      } else {
-        // object with keys
-        const arr1 = Array.isArray(req.files.photo)
-          ? req.files.photo.map((f) => f.path)
-          : [];
-        const arr2 = Array.isArray(req.files.photos)
-          ? req.files.photos.map((f) => f.path)
-          : [];
-        filesArr = [...arr1, ...arr2];
-      }
-    }
-
-    // If using single upload (req.file):
-    if (req.file && req.file.path) {
-      filesArr.push(req.file.path);
-    }
-
-    // now filesArr contains cloudinary urls (or local paths)
-
-    product.photo = product.photos[0] || null;
-
-    const updated = await product.save();
-    res.json(updated);
+    res.json({ message: "Updated", product: updated });
   } catch (err) {
+    console.log("❌ UPDATE PRODUCT ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };

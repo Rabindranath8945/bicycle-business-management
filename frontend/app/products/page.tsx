@@ -369,11 +369,26 @@ export default function ProductListPage() {
                 />
               ) : null}
             </div>
-            <div className="col-span-4">Product</div>
+            <div className="col-span-3">
+              Product
+              <br />
+              <span className="text-xs text-slate-500">
+                Name • Product No • SKU
+              </span>
+            </div>
+
             <div className="col-span-2">Category</div>
+
             <div className="col-span-1 text-center">Stock</div>
-            <div className="col-span-2 text-right">Price</div>
-            <div className="col-span-1 text-center">Status</div>
+
+            <div className="col-span-1 text-right pr-2">Selling</div>
+
+            <div className="col-span-1 text-right pr-2">Cost</div>
+
+            <div className="col-span-1 text-right pr-2">Wholesale</div>
+
+            <div className="col-span-1 text-center">Barcode</div>
+
             <div className="col-span-1 text-right pr-3">Actions</div>
           </div>
 

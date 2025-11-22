@@ -1,5 +1,5 @@
 import express from "express";
-import upload from "../middleware/uploadMiddleware.js";
+import { upload } from "../middleware/uploadMiddleware.js";
 import {
   createProduct,
   getProducts,
@@ -11,24 +11,10 @@ import {
 const router = express.Router();
 
 // CREATE with multiple photos
-router.post(
-  "/",
-  upload.fields([
-    { name: "photo", maxCount: 6 },
-    { name: "photos", maxCount: 6 },
-  ]),
-  createProduct
-);
+router.post("/", upload.single("photo"), createProduct);
 
 // UPDATE with multiple photos
-router.put(
-  "/:id",
-  upload.fields([
-    { name: "photo", maxCount: 6 },
-    { name: "photos", maxCount: 6 },
-  ]),
-  updateProduct
-);
+router.patch("/:id", upload.single("photo"), updateProduct);
 
 router.get("/", getProducts);
 router.get("/:id", getProductById);

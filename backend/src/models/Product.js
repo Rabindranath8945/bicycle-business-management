@@ -1,31 +1,30 @@
+// backend/models/Product.js
 import mongoose from "mongoose";
 
 const ProductSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
 
-    categoryId: {
+    category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
       required: true,
     },
 
-    category: { type: String }, // snapshot of category name
-
-    sellingPrice: { type: Number, required: true },
-    costPrice: { type: Number, required: true },
+    salePrice: { type: Number, required: true },
+    costPrice: { type: Number, default: 0 },
     wholesalePrice: { type: Number, default: 0 },
 
     stock: { type: Number, default: 0 },
-    unit: { type: String, default: "pcs" },
 
-    hsn: { type: String },
+    productNumber: { type: String }, // auto-generated
     sku: { type: String },
-    barcode: { type: String },
-    productNumber: { type: String, unique: true },
+    hsn: { type: String },
 
-    photos: [String],
-    photo: String, // first image
+    // ⭐ SINGLE PHOTO ONLY
+    photo: { type: String, default: null },
+
+    active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
