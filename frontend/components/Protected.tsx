@@ -1,18 +1,14 @@
 "use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { redirect } from "next/navigation";
 
-export default function Protected({ children }: { children: any }) {
+export default function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user]);
+  if (loading) return null;
 
-  if (loading) return <p>Loading...</p>;
+  if (!user) redirect("/login");
 
-  return user ? children : null;
+  return <>{children}</>;
 }

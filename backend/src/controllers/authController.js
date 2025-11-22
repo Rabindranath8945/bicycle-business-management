@@ -1,67 +1,98 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 
-// Generate JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+// Generate JWT and set cookie
+const sendToken = (res, user) => {
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
+  });
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // TRUE on production
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
 
-// Register
+// ---------------------------
+// REGISTER
+// ---------------------------
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: "User already exists" });
 
-    const user = await User.create({ name, email, password });
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || "staff", // auto-set role
+    });
 
-    res.json({
+    // login immediately after register
+    sendToken(res, user);
+
+    return res.json({
       message: "Registered successfully",
-      user: { id: user._id, name: user.name, email: user.email },
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
-// Login
+// ---------------------------
+// LOGIN
+// ---------------------------
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = generateToken(user._id);
+    sendToken(res, user);
 
-    res
-      .cookie("token", token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      })
-      .json({
-        message: "Login successful",
-        user: { id: user._id, name: user.name, email: user.email },
-      });
+    return res.json({
+      message: "Login successful",
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
-// Logout
+// ---------------------------
+// LOGOUT
+// ---------------------------
 export const logoutUser = (req, res) => {
-  res.clearCookie("token").json({ message: "Logged out" });
+  res.cookie("token", "", { maxAge: 1 });
+  res.json({ message: "Logged out" });
 };
 
-// Get current logged-in user
+// ---------------------------
+// GET LOGGED-IN USER
+// ---------------------------
 export const getMe = async (req, res) => {
-  res.json({ user: req.user });
+  if (!req.user) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  return res.json({
+    _id: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    role: req.user.role,
+  });
 };

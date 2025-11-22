@@ -1,54 +1,67 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
+import { toast } from "sonner";
+import { Lock, User } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
 
-  const handleSubmit = async (e: any) => {
+  const submit = async (e: any) => {
     e.preventDefault();
     try {
       await login(email, password);
-      router.push("/dashboard");
+      toast.success("Logged in");
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      toast.error(err);
     }
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 p-4">
       <form
-        className="w-full max-w-sm bg-white p-6 rounded-lg shadow"
-        onSubmit={handleSubmit}
+        onSubmit={submit}
+        className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-2xl border border-slate-700 w-full max-w-sm shadow-xl"
       >
-        <h1 className="text-xl font-bold mb-4">Login</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">Login</h1>
 
-        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm">Email</label>
+            <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+              <User className="text-slate-500 mr-2" size={18} />
+              <input
+                type="email"
+                className="bg-transparent outline-none w-full"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          </div>
 
-        <input
-          className="w-full border px-3 py-2 mb-3 rounded"
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+          <div>
+            <label className="text-sm">Password</label>
+            <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+              <Lock className="text-slate-500 mr-2" size={18} />
+              <input
+                type="password"
+                className="bg-transparent outline-none w-full"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+        </div>
 
-        <input
-          className="w-full border px-3 py-2 mb-3 rounded"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        <button
+          type="submit"
+          className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-black py-3 rounded-lg font-semibold"
+        >
           Login
         </button>
       </form>

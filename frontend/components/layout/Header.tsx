@@ -67,10 +67,13 @@ export default function Header() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-    // try to fetch logged-in user info from backend
     fetcher("/api/auth/me")
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null));
+      .then((data) => {
+        setUser(data); // ✔ Correct shape
+      })
+      .catch(() => {
+        setUser(null); // ✔ Logged out
+      });
   }, []);
 
   // dropdown states
@@ -311,7 +314,7 @@ export default function Header() {
           </button>
 
           {/* Profile */}
-          <ProfileDropdown user={{ ...user, role: user?.role ?? "Admin" }} />
+          <ProfileDropdown user={user ?? undefined} />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/lib/context/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -240,7 +241,11 @@ const menu = [
 ];
 
 export default function Sidebar() {
+  const { user } = useAuth();
   const pathname = usePathname();
+
+  if (!user) return null;
+
   const [collapsed, setCollapsed] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);

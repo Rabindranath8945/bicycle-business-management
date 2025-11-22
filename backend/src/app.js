@@ -49,7 +49,7 @@ app.use(cookieParser());
 /* Routes */
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
-app.use("/api/users", authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/suppliers", supplierRoutes);
