@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import {
@@ -7,6 +6,7 @@ import {
   generateProductNumber,
 } from "../utils/generateCode.js";
 
+// Auto HSN helper
 const autoHSN = (name = "") => {
   name = name.toLowerCase();
   if (name.includes("cycle")) return "8712";
@@ -17,9 +17,9 @@ const autoHSN = (name = "") => {
   return "9999";
 };
 
-// ----------------------------------------------------------
-// CREATE PRODUCT (backend generates codes)
-// ----------------------------------------------------------
+/* ------------------------------------------------------------------
+   CREATE PRODUCT  (backend also generates barcode + sku + productNumber)
+--------------------------------------------------------------------- */
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -37,6 +37,12 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
+    // Backend always generates codes if missing
+    const finalSKU = sku || generateSKU(name);
+    const finalBarcode = generateBarcode();
+    const finalProductNumber = generateProductNumber();
+    const finalHSN = hsn || autoHSN(name);
+
     const product = new Product({
       name,
       categoryId: category,
@@ -44,14 +50,15 @@ export const createProduct = async (req, res) => {
       costPrice: Number(costPrice || 0),
       wholesalePrice: Number(wholesalePrice || 0),
       stock: Number(stock || 0),
-      sku,
-      hsn,
-      // photo gets added below if exists
+
+      sku: finalSKU,
+      barcode: finalBarcode,
+      productNumber: finalProductNumber,
+      hsn: finalHSN,
     });
 
-    // If a file is uploaded
     if (req.file) {
-      product.photo = req.file.path; // Cloudinary URL
+      product.photo = req.file.path;
     }
 
     await product.save();
@@ -63,49 +70,50 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// ----------------------------------------------------------
-// GET PRODUCTS
-// ----------------------------------------------------------
+/* ------------------------------------------------------------------
+   GET PRODUCTS
+--------------------------------------------------------------------- */
 export const getProducts = async (req, res) => {
   try {
     const products = await Product.find()
-      .populate("category", "name")
+      .populate("categoryId", "name")
       .sort({ createdAt: -1 });
 
-    res.json(
-      products.map((p) => ({
-        ...p._doc,
-        categoryName: p.category?.name || "Uncategorized",
-      }))
-    );
+    const final = products.map((p) => ({
+      ...p.toObject(),
+      categoryName: p.categoryId?.name || "Uncategorized",
+    }));
+
+    res.json(final);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ----------------------------------------------------------
-// GET ONE PRODUCT
-// ----------------------------------------------------------
+/* ------------------------------------------------------------------
+   GET ONE PRODUCT
+--------------------------------------------------------------------- */
 export const getProductById = async (req, res) => {
   try {
     const p = await Product.findById(req.params.id).populate(
-      "category",
+      "categoryId",
       "name"
     );
+
     if (!p) return res.status(404).json({ message: "Not found" });
 
     res.json({
-      ...p._doc,
-      categoryName: p.category?.name || "Uncategorized",
+      ...p.toObject(),
+      categoryName: p.categoryId?.name || "Uncategorized",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ----------------------------------------------------------
-// UPDATE PRODUCT
-// ----------------------------------------------------------
+/* ------------------------------------------------------------------
+   UPDATE PRODUCT
+--------------------------------------------------------------------- */
 export const updateProduct = async (req, res) => {
   try {
     const {
@@ -145,9 +153,9 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// ----------------------------------------------------------
-// DELETE PRODUCT
-// ----------------------------------------------------------
+/* ------------------------------------------------------------------
+   DELETE PRODUCT
+--------------------------------------------------------------------- */
 export const deleteProduct = async (req, res) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
@@ -157,21 +165,46 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+/* ------------------------------------------------------------------
+   SEARCH PRODUCTS   (Used by ProductDrawer & POS)
+--------------------------------------------------------------------- */
 export const searchProducts = async (req, res) => {
   try {
     const q = req.query.q || "";
-    const products = await Product.find({
-      name: { $regex: q, $options: "i" },
-    })
-      .limit(50)
-      .sort({ name: 1 });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 30;
 
-    res.json(products);
+    const query = {
+      name: { $regex: q, $options: "i" },
+    };
+
+    const total = await Product.countDocuments(query);
+
+    const products = await Product.find(query)
+      .populate("categoryId", "name")
+      .sort({ name: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const formatted = products.map((p) => ({
+      ...p.toObject(),
+      categoryName: p.categoryId?.name || "Uncategorized",
+    }));
+
+    res.json({
+      items: formatted,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    });
   } catch (err) {
     res.status(500).json({ message: "Search failed" });
   }
 };
 
+/* ------------------------------------------------------------------
+   GET PRODUCT BY BARCODE   (Used by POS Scan Mode)
+--------------------------------------------------------------------- */
 export const getProductByBarcode = async (req, res) => {
   try {
     const code = req.params.code;

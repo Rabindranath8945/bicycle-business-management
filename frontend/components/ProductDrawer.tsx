@@ -80,12 +80,13 @@ export default function ProductDrawer({ open, onClose, onAdd }: Props) {
       if (activeCat) params.append("category", activeCat);
 
       const res = await axios.get(`/api/products/search?${params.toString()}`);
-      const data = res.data || [];
+      const data = Array.isArray(res.data.items) ? res.data.items : [];
       if (replace) {
         setProducts(data);
       } else {
         setProducts((s) => [...s, ...data]);
       }
+      setHasMore(data.length === 30);
       if (!Array.isArray(data) || data.length < 30) setHasMore(false);
       else setHasMore(true);
       setPage(p);
