@@ -18,6 +18,13 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
+  // ---- MAKE USER STABLE (PREVENT RE-RENDER HOOK MISMATCH) ----
+  const safeUser = {
+    name: user?.name ?? "User",
+    avatar: user?.avatar ?? null,
+    role: user?.role ?? "User",
+  };
+
   // close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -54,26 +61,26 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
         className="flex items-center gap-2 p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition"
         aria-label="User menu"
       >
-        {user?.avatar ? (
+        {safeUser.avatar ? (
           <img
-            src={user.avatar}
-            alt={user.name || "User"}
+            src={safeUser.avatar}
+            alt={safeUser.name}
             className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
           />
         ) : (
           <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-semibold">
-            {user?.name?.[0]?.toUpperCase() || "U"}
+            {safeUser.name[0]?.toUpperCase()}
           </div>
         )}
 
         <div className="hidden sm:flex flex-col items-start text-left leading-tight">
-          <span className="text-sm font-medium">{user?.name || "User"}</span>
+          <span className="text-sm font-medium">{safeUser.name}</span>
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getRoleColor(
-              user?.role
+              safeUser.role
             )}`}
           >
-            {user?.role || "User"}
+            {safeUser.role}
           </span>
         </div>
       </button>
@@ -89,13 +96,13 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
             className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
           >
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-              <div className="font-medium text-sm">{user?.name || "User"}</div>
+              <div className="font-medium text-sm">{safeUser.name}</div>
               <div
                 className={`inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${getRoleColor(
-                  user?.role
+                  safeUser.role
                 )}`}
               >
-                {user?.role || "User"}
+                {safeUser.role}
               </div>
             </div>
 

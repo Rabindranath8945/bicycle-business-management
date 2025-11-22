@@ -39,7 +39,7 @@ export const createProduct = async (req, res) => {
 
     const product = new Product({
       name,
-      category,
+      categoryId: category,
       salePrice: Number(sellingPrice),
       costPrice: Number(costPrice || 0),
       wholesalePrice: Number(wholesalePrice || 0),
@@ -121,7 +121,7 @@ export const updateProduct = async (req, res) => {
 
     const update = {
       name,
-      category,
+      categoryId: category,
       salePrice: Number(sellingPrice),
       costPrice: Number(costPrice || 0),
       wholesalePrice: Number(wholesalePrice || 0),
@@ -154,5 +154,34 @@ export const deleteProduct = async (req, res) => {
     res.json({ message: "Deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const searchProducts = async (req, res) => {
+  try {
+    const q = req.query.q || "";
+    const products = await Product.find({
+      name: { $regex: q, $options: "i" },
+    })
+      .limit(50)
+      .sort({ name: 1 });
+
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: "Search failed" });
+  }
+};
+
+export const getProductByBarcode = async (req, res) => {
+  try {
+    const code = req.params.code;
+
+    const product = await Product.findOne({ barcode: code });
+
+    if (!product) return res.status(404).json({ message: "Not found" });
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: "Barcode lookup failed" });
   }
 };

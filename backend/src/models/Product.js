@@ -1,11 +1,11 @@
-// backend/models/Product.js
 import mongoose from "mongoose";
 
 const ProductSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
 
-    category: {
+    // 🔥 FIX 1 — your controller uses categoryId; unify naming
+    categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
       required: true,
@@ -17,11 +17,14 @@ const ProductSchema = new mongoose.Schema(
 
     stock: { type: Number, default: 0 },
 
-    productNumber: { type: String }, // auto-generated
+    // 🔥 FIX 2 — missing barcode field (required for Scan Mode & search)
+    barcode: { type: String, unique: true, sparse: true },
+
+    productNumber: { type: String }, // auto-generated internal ID
     sku: { type: String },
+
     hsn: { type: String },
 
-    // ⭐ SINGLE PHOTO ONLY
     photo: { type: String, default: null },
 
     active: { type: Boolean, default: true },

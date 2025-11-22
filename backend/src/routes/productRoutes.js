@@ -6,18 +6,18 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  searchProducts,
+  getProductByBarcode,
 } from "../controllers/productController.js";
 
 const router = express.Router();
 
-// CREATE with multiple photos
 router.post("/", upload.single("photo"), createProduct);
-
-// UPDATE with multiple photos
 router.patch("/:id", upload.single("photo"), updateProduct);
-
 router.get("/", getProducts);
 router.get("/:id", getProductById);
 router.delete("/:id", deleteProduct);
+router.get("/search", searchProducts);
+router.get("/barcode/:code", getProductByBarcode);
 
 export default router;
