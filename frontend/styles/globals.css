@@ -33,3 +33,13 @@
   );
   backdrop-filter: blur(6px);
 }
+@keyframes ripple {
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 0.5s linear;
+}

@@ -41,18 +41,13 @@ export const createProduct = async (req, res) => {
     const cat = await Category.findById(categoryId);
     if (cat) categoryName = cat.name;
 
-    // incoming req.files when using upload.fields will be an object like:
-    // { photo: [file1,...], photos: [file1,...] }
-
+    // Gather uploaded files
     let filesArr = [];
 
-    // when using upload.fields:
     if (req.files) {
       if (Array.isArray(req.files)) {
-        // unlikely with upload.fields, but handle it
         filesArr = req.files.map((f) => f.path);
       } else {
-        // object with keys
         const arr1 = Array.isArray(req.files.photo)
           ? req.files.photo.map((f) => f.path)
           : [];
@@ -63,20 +58,17 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // If using single upload (req.file):
-    if (req.file && req.file.path) {
+    if (req.file?.path) {
       filesArr.push(req.file.path);
     }
 
-    // now filesArr contains cloudinary urls (or local paths)
-
-    // Auto-generate codes
+    // Generate codes
     const sku = generateSKU(categoryName);
     const barcode = generateBarcode();
     const productNumber = await generateProductNumber(Product);
     const auto_hsn = hsn || autoHSN(categoryName);
 
-    // Save
+    // SAVE PRODUCT (FIXED)
     const created = await Product.create({
       name,
       categoryId,
@@ -90,13 +82,14 @@ export const createProduct = async (req, res) => {
       sku,
       barcode,
       productNumber,
-      photos,
-      photo: photos[0] || null,
+      photos: filesArr, // FIXED
+      photo: filesArr[0] || null, // FIXED
     });
 
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("❌ createProduct error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
