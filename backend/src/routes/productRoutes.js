@@ -1,5 +1,5 @@
 import express from "express";
-import { upload } from "../middleware/uploadMiddleware.js";
+import upload from "../middleware/uploadMiddleware.js";
 import {
   createProduct,
   getProducts,
@@ -10,13 +10,14 @@ import {
 
 const router = express.Router();
 
-router.post("/", upload.array("photos", 10), createProduct);
+// CREATE with multiple photos
+router.post("/", upload.array("photos", 6), createProduct);
+
+// UPDATE with multiple photos
+router.put("/:id", upload.array("photos", 6), updateProduct);
 
 router.get("/", getProducts);
 router.get("/:id", getProductById);
-
-router.put("/:id", upload.array("photos", 10), updateProduct);
-
 router.delete("/:id", deleteProduct);
 
 export default router;

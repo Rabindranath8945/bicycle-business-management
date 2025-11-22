@@ -20,12 +20,13 @@ interface Product {
   name?: string;
   productNumber?: string;
   sku?: string;
+  categoryName?: string;
   categoryId?: { name?: string } | string | null;
   sellingPrice?: number;
   costPrice?: number;
   barcode?: string;
-  photos?: string[]; // MAYBE undefined
-  photo?: string; // fallback single photo field
+  photos?: string[];
+  photo?: string;
   stock?: number;
   hsn?: string;
   [key: string]: any;
@@ -70,16 +71,18 @@ export default function ProductListPage() {
     load();
   }, []);
 
-  // Build list of categories from products
+  // Build list of categories from products (fully fixed)
   const categories = useMemo(() => {
     const set = new Set<string>();
 
     products.forEach((p) => {
-      const name =
+      const categoryName =
         p.categoryName ??
-        (typeof p.categoryId === "string" ? "" : p.categoryId?.name);
+        (typeof p.categoryId === "object" && p.categoryId?.name
+          ? p.categoryId.name
+          : "Uncategorized");
 
-      if (name) set.add(name);
+      set.add(categoryName);
     });
 
     return Array.from(set);
@@ -91,24 +94,32 @@ export default function ProductListPage() {
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      out = out.filter(
-        (p) =>
+
+      out = out.filter((p) => {
+        const categoryName =
+          p.categoryName ??
+          (typeof p.categoryId === "object" && p.categoryId?.name
+            ? p.categoryId.name
+            : "Uncategorized");
+
+        return (
           (p.name || "").toLowerCase().includes(q) ||
           (p.sku || "").toLowerCase().includes(q) ||
           (p.productNumber || "").toLowerCase().includes(q) ||
-          (typeof p.categoryId === "string"
-            ? p.categoryId.toLowerCase().includes(q)
-            : (p.categoryId?.name || "").toLowerCase().includes(q))
-      );
+          categoryName.toLowerCase().includes(q)
+        );
+      });
     }
 
     if (selectedCategory) {
       out = out.filter((p) => {
-        const name =
+        const categoryName =
           p.categoryName ??
-          (typeof p.categoryId === "string" ? "" : p.categoryId?.name);
+          (typeof p.categoryId === "object" && p.categoryId?.name
+            ? p.categoryId.name
+            : "Uncategorized");
 
-        return name === selectedCategory;
+        return categoryName === selectedCategory;
       });
     }
 
@@ -125,13 +136,11 @@ export default function ProductListPage() {
     }
 
     setFiltered(out);
-    // reset page to 1 whenever filters change
     setPage(1);
-    // ensure selectedIds only contains visible ids
+
     setSelectedIds((prev) =>
       prev.filter((id) => out.some((p) => p._id === id))
     );
-    // un-check selectAllVisible when filter changes
     setSelectAllVisible(false);
   }, [products, search, sortBy, selectedCategory]);
 
@@ -142,7 +151,7 @@ export default function ProductListPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
-  // Render barcodes: use product _id in DOM id so it's stable
+  // Render barcodes
   useEffect(() => {
     paginated.forEach((p) => {
       if (!p.barcode) return;
@@ -196,7 +205,7 @@ export default function ProductListPage() {
     setMainQuickImage(src);
   };
 
-  // ------------------ Multi-select helpers ------------------
+  // Multi-select
   const toggleSelect = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
       if (checked) return Array.from(new Set([...prev, id]));
@@ -208,7 +217,6 @@ export default function ProductListPage() {
     setSelectAllVisible((s) => {
       const next = !s;
       if (next) {
-        // select all currently visible in the grid (paginated)
         setSelectedIds(paginated.map((p) => p._id));
       } else {
         setSelectedIds([]);
@@ -217,7 +225,7 @@ export default function ProductListPage() {
     });
   };
 
-  // ------------------ Export to Excel ------------------
+  // Excel Export
   const exportExcel = useCallback(() => {
     import("xlsx")
       .then((xlsx) => {
@@ -225,9 +233,10 @@ export default function ProductListPage() {
           ID: p._id,
           Name: p.name ?? "",
           Category:
-            typeof p.categoryId === "string"
-              ? p.categoryId
-              : p.categoryId?.name ?? "",
+            p.categoryName ??
+            (typeof p.categoryId === "object" && p.categoryId?.name
+              ? p.categoryId.name
+              : "Uncategorized"),
           ProductNumber: p.productNumber ?? "",
           SKU: p.sku ?? "",
           SellingPrice: p.sellingPrice ?? 0,
@@ -243,12 +252,12 @@ export default function ProductListPage() {
         xlsx.writeFile(book, `products_${new Date().toISOString()}.xlsx`);
       })
       .catch((err) => {
-        console.error("Failed to export excel", err);
-        alert("Excel export failed. Make sure xlsx is installed.");
+        console.error("Excel export failed", err);
+        alert("Excel export failed");
       });
   }, [filtered]);
 
-  // ------------------ CSV Export (no dependency) ------------------
+  // CSV Export
   const exportCSV = useCallback(() => {
     if (!filtered.length) {
       alert("No products to export");
@@ -259,9 +268,10 @@ export default function ProductListPage() {
       ID: p._id,
       Name: p.name ?? "",
       Category:
-        typeof p.categoryId === "string"
-          ? p.categoryId
-          : p.categoryId?.name ?? "",
+        p.categoryName ??
+        (typeof p.categoryId === "object" && p.categoryId?.name
+          ? p.categoryId.name
+          : "Uncategorized"),
       ProductNumber: p.productNumber ?? "",
       SKU: p.sku ?? "",
       SellingPrice: p.sellingPrice ?? 0,
@@ -276,11 +286,7 @@ export default function ProductListPage() {
       header.join(","),
       ...rows.map((r) =>
         header
-          .map((h) => {
-            const cell = String((r as any)[h] ?? "");
-            // escape quotes
-            return `"${cell.replace(/"/g, '""')}"`;
-          })
+          .map((h) => `"${String((r as any)[h] ?? "").replace(/"/g, '""')}"`)
           .join(",")
       ),
     ].join("\n");
@@ -294,13 +300,11 @@ export default function ProductListPage() {
     window.URL.revokeObjectURL(url);
   }, [filtered]);
 
-  // ------------------ Delete selected ------------------
+  // Delete selected
   const deleteSelected = async () => {
     if (selectedIds.length === 0) return;
     if (
-      !confirm(
-        `Delete ${selectedIds.length} selected products? This cannot be undone.`
-      )
+      !confirm(`Delete ${selectedIds.length} products? This cannot be undone.`)
     )
       return;
 
@@ -311,17 +315,16 @@ export default function ProductListPage() {
       setProducts((prev) => prev.filter((p) => !selectedIds.includes(p._id)));
       setSelectedIds([]);
       setSelectAllVisible(false);
-      alert("Selected products deleted");
+      alert("Deleted!");
     } catch (err) {
       console.error("delete selected failed", err);
-      alert("Failed to delete selected products");
+      alert("Failed to delete selected");
     }
   };
 
-  // Keep page in valid range if totalPages changes
+  // Keep page valid if totalPages changes
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalPages]);
 
   if (loading) {
@@ -373,28 +376,28 @@ export default function ProductListPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Export Buttons */}
+            {/* Export buttons */}
             <button
               onClick={exportExcel}
               className="text-xs px-3 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200"
             >
-              Export Excel
+              Excel
             </button>
 
             <button
               onClick={exportCSV}
               className="text-xs px-3 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200"
             >
-              Export CSV
+              CSV
             </button>
 
-            {/* Delete Selected */}
+            {/* Delete selected */}
             <button
               disabled={selectedIds.length === 0}
               onClick={deleteSelected}
               className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded disabled:bg-slate-700 disabled:cursor-not-allowed"
             >
-              Delete Selected ({selectedIds.length})
+              Delete ({selectedIds.length})
             </button>
 
             <Link
@@ -407,7 +410,7 @@ export default function ProductListPage() {
         </div>
       </div>
 
-      {/* Search & Category Chips */}
+      {/* Search + Category */}
       <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="relative w-full md:w-1/2">
           <Search className="absolute left-3 top-3 text-slate-400" size={18} />
@@ -420,13 +423,14 @@ export default function ProductListPage() {
         </div>
 
         <div className="flex gap-2 items-center flex-wrap">
-          {/* Category dropdown (new) */}
+          {/* Category dropdown */}
           <select
             value={selectedCategory ?? ""}
             onChange={(e) => setSelectedCategory(e.target.value || null)}
             className="bg-slate-800 border border-slate-700 rounded px-3 py-1 text-slate-200"
           >
             <option value="">All Categories</option>
+
             {categories.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -434,7 +438,7 @@ export default function ProductListPage() {
             ))}
           </select>
 
-          {/* Select all visible toggle */}
+          {/* Select all visible */}
           <label className="ml-2 text-xs flex items-center gap-1 text-slate-300">
             <input
               type="checkbox"
@@ -461,10 +465,13 @@ export default function ProductListPage() {
           {paginated.map((p) => {
             const photos = p.photos ?? (p.photo ? [p.photo] : []);
             const mainImage = photos[0] ?? "/no-image.png";
+
             const categoryName =
               p.categoryName ??
-              (typeof p.categoryId === "string" ? "" : p.categoryId?.name) ??
-              "Uncategorized";
+              (typeof p.categoryId === "object" && p.categoryId?.name
+                ? p.categoryId.name
+                : "Uncategorized");
+
             const stock = p.stock ?? 0;
             const checked = selectedIds.includes(p._id);
 
@@ -475,7 +482,7 @@ export default function ProductListPage() {
                 whileHover={{ scale: 1.015 }}
                 className="bg-slate-900 border border-slate-700 rounded-xl p-4 shadow-lg hover:border-emerald-500/50 transition relative"
               >
-                {/* Checkbox top-left */}
+                {/* Checkbox */}
                 <div className="absolute left-3 top-3 z-10">
                   <input
                     type="checkbox"
@@ -485,9 +492,8 @@ export default function ProductListPage() {
                   />
                 </div>
 
-                {/* Image area */}
+                {/* Image */}
                 <div className="w-full h-44 bg-slate-800 rounded-lg overflow-hidden mb-3 relative group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mainImage}
                     alt={p.name}
@@ -501,10 +507,8 @@ export default function ProductListPage() {
                           key={i}
                           className="w-10 h-10 rounded border border-slate-700 overflow-hidden"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={src}
-                            alt={`thumb-${i}`}
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -513,12 +517,13 @@ export default function ProductListPage() {
                   )}
                 </div>
 
-                {/* Title and quick actions */}
+                {/* Info */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-white font-semibold truncate">
                       {p.name}
                     </h3>
+
                     <div className="text-xs text-slate-400 mt-1">
                       <span className="block">
                         Product No: {p.productNumber ?? "—"}
@@ -664,7 +669,6 @@ export default function ProductListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="w-full h-72 bg-slate-800 rounded-lg overflow-hidden mb-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mainQuickImage ?? "/no-image.png"}
                     className="w-full h-full object-contain p-4 bg-black/5"
@@ -679,24 +683,21 @@ export default function ProductListPage() {
                   ).map((src, i) => (
                     <button
                       key={i}
-                      onClick={() => handleThumbnailClick(src)}
+                      onClick={() => setMainQuickImage(src)}
                       className="w-20 h-20 rounded border border-slate-700 overflow-hidden"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={src}
-                        className="w-full h-full object-cover"
-                        alt={`thumb-${i}`}
-                      />
+                      <img src={src} className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
               </div>
 
+              {/* Right side */}
               <div>
                 <h2 className="text-lg text-white font-semibold">
                   {quickProduct.name}
                 </h2>
+
                 <div className="text-xs text-slate-400 mt-2">
                   <div>Product No: {quickProduct.productNumber ?? "—"}</div>
                   <div>SKU: {quickProduct.sku ?? "—"}</div>
@@ -704,10 +705,10 @@ export default function ProductListPage() {
                     Category:{" "}
                     <span className="text-emerald-400">
                       {quickProduct.categoryName ??
-                        (typeof quickProduct.categoryId === "string"
-                          ? ""
-                          : quickProduct.categoryId?.name) ??
-                        "—"}
+                        (typeof quickProduct.categoryId === "object" &&
+                        quickProduct.categoryId?.name
+                          ? quickProduct.categoryId.name
+                          : "Uncategorized")}
                     </span>
                   </div>
                 </div>
@@ -738,7 +739,6 @@ export default function ProductListPage() {
                       <div className="text-xs text-slate-500 mt-2">
                         {quickProduct.barcode}
                       </div>
-                      {/* render quick barcode */}
                       <BarcodeRenderer
                         id={`quickbar-${quickProduct._id}`}
                         value={quickProduct.barcode}
@@ -775,10 +775,6 @@ export default function ProductListPage() {
   );
 }
 
-/**
- * Helper component: small wrapper to render barcode into svg identified by id
- * This isolated component uses JsBarcode and runs on mount.
- */
 function BarcodeRenderer({ id, value }: { id: string; value?: string }) {
   useEffect(() => {
     if (!value) return;
