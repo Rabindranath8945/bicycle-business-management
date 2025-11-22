@@ -36,10 +36,20 @@ type Product = {
   costPrice?: number;
   taxPercent?: number;
   stock?: number;
-  categoryName?: string;
+
+  // category
+  category?: {
+    _id: string;
+    name: string;
+  };
+  categoryName?: string; // for search results
+
+  // codes
   hsn?: string;
-  photo?: string | null;
   sku?: string;
+
+  // image
+  photo?: string | null;
 };
 
 type CartItem = {

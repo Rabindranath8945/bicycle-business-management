@@ -69,13 +69,13 @@ export const createProduct = async (req, res) => {
 export const getProducts = async (req, res) => {
   try {
     const products = await Product.find()
-      .populate("categoryId", "name")
+      .populate("category", "name")
       .sort({ createdAt: -1 });
 
     res.json(
       products.map((p) => ({
         ...p._doc,
-        categoryName: p.categoryId?.name || "Uncategorized",
+        categoryName: p.category?.name || "Uncategorized",
       }))
     );
   } catch (err) {
@@ -89,14 +89,14 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const p = await Product.findById(req.params.id).populate(
-      "categoryId",
+      "category",
       "name"
     );
     if (!p) return res.status(404).json({ message: "Not found" });
 
     res.json({
       ...p._doc,
-      categoryName: p.categoryId?.name || "Uncategorized",
+      categoryName: p.category?.name || "Uncategorized",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

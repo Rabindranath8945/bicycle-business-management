@@ -9,12 +9,16 @@ type Product = {
   _id: string;
   name: string;
   salePrice: number;
-  taxPercent?: number;
+  costPrice?: number;
   stock?: number;
-  categoryName?: string;
+  photo?: string;
   hsn?: string;
-  photo?: string | null;
   sku?: string;
+  category?: {
+    _id: string;
+    name: string;
+  };
+  categoryName?: string;
 };
 
 type Props = {
