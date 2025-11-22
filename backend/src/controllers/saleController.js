@@ -1,6 +1,6 @@
 import Sale from "../models/Sale.js";
 import Product from "../models/Product.js";
-
+import Customer from "../models/Customer.js";
 import PDFDocument from "pdfkit";
 import streamBuffers from "stream-buffers";
 
@@ -87,7 +87,6 @@ export const createSale = async (req, res) => {
   try {
     const { customerName, phone, discount, paymentMode, items } = req.body;
 
-    // Validate cart
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Cart is empty" });
     }
@@ -95,11 +94,9 @@ export const createSale = async (req, res) => {
     let subtotal = 0;
     let totalTax = 0;
 
-    // Prepare items with server-side calculation
     const finalItems = await Promise.all(
       items.map(async (item) => {
         const product = await Product.findById(item.productId);
-
         if (!product) throw new Error("Product not found");
 
         const qty = Number(item.qty || 1);
@@ -108,7 +105,6 @@ export const createSale = async (req, res) => {
 
         const lineSubtotal = qty * unitPrice;
         const taxAmount = (lineSubtotal * taxPercent) / 100;
-        const lineTotal = lineSubtotal + taxAmount;
 
         subtotal += lineSubtotal;
         totalTax += taxAmount;
@@ -121,7 +117,7 @@ export const createSale = async (req, res) => {
           unitPrice,
           taxPercent,
           taxAmount,
-          total: lineTotal,
+          total: lineSubtotal + taxAmount,
         };
       })
     );
@@ -129,7 +125,7 @@ export const createSale = async (req, res) => {
     const grandTotal = subtotal + totalTax - Number(discount || 0);
     const invoiceNo = await generateInvoiceNo();
 
-    // Save sale
+    // SAVE SALE
     const newSale = await Sale.create({
       invoiceNo,
       customerName,
@@ -142,7 +138,7 @@ export const createSale = async (req, res) => {
       paymentMode: paymentMode || "Cash",
     });
 
-    // Update stock
+    // STOCK UPDATE
     await Promise.all(
       finalItems.map(async (item) => {
         await Product.findByIdAndUpdate(item.productId, {
@@ -151,10 +147,24 @@ export const createSale = async (req, res) => {
       })
     );
 
-    // Generate PDF Base64
+    // ⭐ CUSTOMER AUTO SAVE + SALES HISTORY
+    if (phone) {
+      let customer = await Customer.findOne({ phone });
+
+      if (!customer) {
+        customer = await Customer.create({
+          name: customerName || "Walk-in Customer",
+          phone,
+          sales: [],
+        });
+      }
+
+      customer.sales.push(newSale._id);
+      await customer.save();
+    }
+
     const pdfBase64 = await createInvoicePDF(newSale);
 
-    // Response
     res.status(201).json({
       message: "Sale completed successfully",
       sale: newSale,

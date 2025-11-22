@@ -160,7 +160,12 @@ export default function PaymentDrawer({
       {/* FOOTER */}
       <div className="p-4 border-t border-slate-700">
         <button
-          onClick={confirm}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            confirm();
+          }}
           className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-black font-semibold text-lg"
         >
           Confirm Payment

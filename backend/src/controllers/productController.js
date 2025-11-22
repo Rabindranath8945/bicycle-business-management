@@ -114,6 +114,9 @@ export const getProductById = async (req, res) => {
 /* ------------------------------------------------------------------
    UPDATE PRODUCT
 --------------------------------------------------------------------- */
+// ----------------------------------------------------------
+// UPDATE PRODUCT (supports photo update + all fields)
+// ----------------------------------------------------------
 export const updateProduct = async (req, res) => {
   try {
     const {
@@ -127,29 +130,45 @@ export const updateProduct = async (req, res) => {
       hsn,
     } = req.body;
 
-    const update = {
-      name,
-      categoryId: category,
-      salePrice: Number(sellingPrice),
-      costPrice: Number(costPrice || 0),
-      wholesalePrice: Number(wholesalePrice || 0),
-      stock: Number(stock || 0),
-      sku,
-      hsn,
-    };
+    const update = {};
 
+    if (name) update.name = name;
+    if (category) update.categoryId = category;
+    if (sellingPrice !== undefined) update.salePrice = Number(sellingPrice);
+    if (costPrice !== undefined) update.costPrice = Number(costPrice);
+    if (wholesalePrice !== undefined)
+      update.wholesalePrice = Number(wholesalePrice);
+    if (stock !== undefined) update.stock = Number(stock);
+
+    // codes (only update when sent by UI — do NOT regenerate automatically)
+    if (sku) update.sku = sku;
+    if (hsn) update.hsn = hsn;
+
+    // If new image is uploaded
     if (req.file) {
-      update.photo = req.file.path;
+      update.photo = req.file.path; // cloudinary URL
     }
 
-    const updated = await Product.findByIdAndUpdate(req.params.id, update, {
-      new: true,
-    });
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true }
+    ).populate("categoryId", "name");
 
-    res.json({ message: "Updated", product: updated });
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({
+      message: "Product updated successfully",
+      product: {
+        ...updatedProduct._doc,
+        categoryName: updatedProduct.categoryId?.name || "",
+      },
+    });
   } catch (err) {
     console.log("❌ UPDATE PRODUCT ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message || "Update failed" });
   }
 };
 

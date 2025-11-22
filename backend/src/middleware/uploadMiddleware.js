@@ -9,11 +9,16 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// FIXED STORAGE CONFIG (must use params as a function)
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: "products",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  params: async (req, file) => {
+    return {
+      folder: "products",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+      transformation: [{ width: 600, height: 600, crop: "limit" }],
+    };
   },
 });
 
