@@ -157,99 +157,60 @@ export const getProductById = async (req, res) => {
 -------------------------------------------------------- */
 export const updateProduct = async (req, res) => {
   try {
-    const id = req.params.id;
+    const productId = req.params.id;
 
-    // Validate product ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    let product = await Product.findById(id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    const existing = await Product.findById(productId);
+    if (!existing)
+      return res.status(404).json({ message: "Product not found" });
 
-    const body = req.body;
+    // ---------------------------
+    // Update BASIC FIELDS
+    // ---------------------------
+    existing.name = req.body.name || existing.name;
+    existing.categoryId = req.body.categoryId || existing.categoryId;
+    existing.sellingPrice = req.body.sellingPrice || existing.sellingPrice;
+    existing.costPrice = req.body.costPrice || existing.costPrice;
+    existing.wholesalePrice =
+      req.body.wholesalePrice || existing.wholesalePrice;
+    existing.stock = req.body.stock || existing.stock;
+    existing.unit = req.body.unit || existing.unit;
+    existing.hsn = req.body.hsn || existing.hsn;
+    existing.sku = req.body.sku || existing.sku;
 
-    // -------------------------------------------------------------
-    // CATEGORY FIX
-    // -------------------------------------------------------------
-    let categoryId = body.categoryId;
+    // ---------------------------
+    // FIX: Category Auto Populate
+    // ---------------------------
+    await existing.populate("categoryId", "name");
 
-    if (
-      !categoryId ||
-      categoryId === "null" ||
-      categoryId === "undefined" ||
-      categoryId === ""
-    ) {
-      categoryId = null;
-    } else if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-      categoryId = null;
+    // ---------------------------
+    // IMAGE LOGIC
+    // ---------------------------
+    const incomingFiles = req.files ? req.files.map((f) => f.path) : [];
+
+    // CLEAR ALL PHOTOS
+    if (req.body.clearPhotos === "1") {
+      existing.photos = [];
     }
 
-    let categoryName = product.category; // default old category name
-
-    if (categoryId) {
-      const catData = await Category.findById(categoryId);
-      if (catData) categoryName = catData.name;
-    } else {
-      categoryName = "Uncategorized";
+    // ADD NEW PHOTOS
+    if (incomingFiles.length > 0) {
+      existing.photos = [...existing.photos, ...incomingFiles];
     }
 
-    // -------------------------------------------------------------
-    // PHOTO FIX
-    // -------------------------------------------------------------
-    let existingPhotos = [];
+    // Save final result
+    const updated = await existing.save();
 
-    if (Array.isArray(product.photos)) existingPhotos = [...product.photos];
-    if (product.photo) existingPhotos.push(product.photo); // legacy field
+    // Ensure category is included in response
+    await updated.populate("categoryId", "name");
 
-    // clearPhotos flag
-    if (body.clearPhotos == "1") {
-      existingPhotos = [];
-    }
-
-    // new uploaded photos
-    const newPhotos =
-      Array.isArray(req.files) && req.files.length > 0
-        ? req.files.map((f) => f.path)
-        : [];
-
-    const finalPhotos = [...existingPhotos, ...newPhotos];
-
-    // -------------------------------------------------------------
-    // NUMERIC FIELDS FIX
-    // -------------------------------------------------------------
-    const castNum = (v) => {
-      if (v === undefined || v === null || v === "") return undefined;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
-    };
-
-    // -------------------------------------------------------------
-    // UPDATE OBJECT
-    // -------------------------------------------------------------
-    const updates = {
-      name: body.name ?? product.name,
-      categoryId: categoryId,
-      category: categoryName,
-      sellingPrice: castNum(body.sellingPrice) ?? product.sellingPrice,
-      costPrice: castNum(body.costPrice) ?? product.costPrice,
-      wholesalePrice: castNum(body.wholesalePrice) ?? product.wholesalePrice,
-      stock: castNum(body.stock) ?? product.stock,
-      unit: body.unit ?? product.unit,
-      hsn: body.hsn ?? product.hsn,
-      sku: body.sku ?? product.sku,
-      photos: finalPhotos,
-    };
-
-    // -------------------------------------------------------------
-    // UPDATE PRODUCT
-    // -------------------------------------------------------------
-    const updated = await Product.findByIdAndUpdate(id, updates, { new: true });
-
-    return res.status(200).json(updated);
-  } catch (error) {
-    console.error("❌ updateProduct error:", error);
-    return res.status(500).json({ message: error.message });
+    res.json(updated);
+  } catch (err) {
+    console.error("updateProduct error:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 

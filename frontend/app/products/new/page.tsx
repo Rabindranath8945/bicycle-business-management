@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "@/lib/axios";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,7 +9,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Package,
-  Layers,
   Upload,
   Tag,
   Barcode,
@@ -17,7 +16,6 @@ import {
   FilePlus2,
   IndianRupee,
 } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 //
@@ -41,6 +39,7 @@ export default function AddProductPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const fileInputKey = useRef<number>(Date.now()); // used to force re-render of file input
 
   const [generatedCodes, setGeneratedCodes] = useState({
     sku: "",
@@ -62,10 +61,16 @@ export default function AddProductPage() {
   // 🔹 Fetch categories
   //
   useEffect(() => {
+    let mounted = true;
     axios
       .get("/api/categories")
-      .then((res) => setCategories(res.data))
+      .then((res) => {
+        if (mounted) setCategories(res.data || []);
+      })
       .catch(() => toast.error("Failed to load categories"));
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   //
@@ -77,7 +82,7 @@ export default function AddProductPage() {
     if (categoryWatch) {
       const selectedCat = categories.find((c) => c._id === categoryWatch);
       if (selectedCat) {
-        const prefix = selectedCat.name.substring(0, 3).toUpperCase();
+        const prefix = (selectedCat.name || "").substring(0, 3).toUpperCase();
         const random = Math.floor(1000 + Math.random() * 9000);
         const sku = `${prefix}-${random}`;
         const barcode = `${Date.now().toString().slice(-6)}${Math.floor(
@@ -99,10 +104,30 @@ export default function AddProductPage() {
   //
   // 🔹 Image preview
   //
-  const handleImageChange = (e: any) => {
-    const file = e.target.files[0];
-    setPhoto(file);
-    if (file) setPreview(URL.createObjectURL(file));
+  useEffect(() => {
+    // clean up object URL when component unmounts or preview changes
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    // revoke any previous preview URL
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPhoto(file);
+      setPreview(url);
+    } else {
+      setPhoto(null);
+      setPreview(null);
+    }
   };
 
   //
@@ -122,19 +147,34 @@ export default function AddProductPage() {
       formData.append("sku", generatedCodes.sku);
       formData.append("barcode", generatedCodes.barcode);
       formData.append("productNumber", generatedCodes.productNumber);
-      if (photo) formData.append("photo", photo);
 
-      const res = await axios.post("/api/products", formData, {
+      // IMPORTANT: backend expects field name "photo" (single or array via upload.array("photo"))
+      // append only when explicit file chosen (prevents accidental re-uploads)
+      if (photo !== null) {
+        formData.append("photo", photo);
+      }
+
+      await axios.post("/api/products", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       toast.success("✅ Product added successfully!");
+
+      // reset the form and file states — this prevents accidental reuse of the file
       reset();
+      setPhoto(null);
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
       setPreview(null);
       setGeneratedCodes({ sku: "", barcode: "", productNumber: "" });
+
+      // force file input new key to prevent browser caching of last file
+      fileInputKey.current = Date.now();
+
       router.push("/products");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to add product");
+      toast.error(error?.response?.data?.message || "Failed to add product");
     }
   };
 
@@ -154,7 +194,11 @@ export default function AddProductPage() {
           Add New Product
         </h1>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-5"
+          autoComplete="off"
+        >
           {/* Product Name */}
           <div>
             <label className="block text-sm mb-1">Product Name</label>
@@ -162,6 +206,7 @@ export default function AddProductPage() {
               {...register("name")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
               placeholder="Enter product name"
+              autoComplete="off"
             />
             {errors.name && (
               <p className="text-red-400 text-xs">{errors.name.message}</p>
@@ -254,15 +299,20 @@ export default function AddProductPage() {
             <label className="block text-sm mb-2 flex items-center gap-2">
               <Upload size={16} /> Product Image
             </label>
+
+            {/* NOTE: key forces input to re-mount after successful submit so browser does not keep prior file */}
             <input
+              key={fileInputKey.current}
               type="file"
               accept="image/*"
               onChange={handleImageChange}
               className="text-sm"
             />
+
             {preview && (
               <div className="mt-3">
-                <Image
+                {/* use plain img for blob preview */}
+                <img
                   src={preview}
                   alt="Preview"
                   width={150}
