@@ -9,9 +9,9 @@ const sendToken = (res, user) => {
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // TRUE on production
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: true, // ⭐ MUST be true for HTTPS (Vercel/Render)
+    sameSite: "none", // ⭐ MUST be none for cross-domain cookies
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
 

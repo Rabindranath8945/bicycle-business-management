@@ -25,7 +25,6 @@ const allowedOrigins = [
   "https://bicycle-datiuj2cl-rabindranath-mondals-projects.vercel.app",
   "https://bicycle-pos.vercel.app", // optional if you rename
 ];
-
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -39,6 +38,8 @@ app.use(
       }
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
