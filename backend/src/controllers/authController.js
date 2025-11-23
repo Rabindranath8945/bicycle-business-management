@@ -59,14 +59,29 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    sendToken(res, user);
+    // Generate token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
+    // Cookie for web
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // Return token for MOBILE APPS
     return res.json({
       message: "Login successful",
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      token, // <-- IMPORTANT
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

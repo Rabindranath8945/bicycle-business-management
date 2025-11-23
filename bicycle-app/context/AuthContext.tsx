@@ -1,86 +1,73 @@
-// context/AuthContext.tsx
-import React, { createContext, useEffect, useState, ReactNode } from "react";
-import * as SecureStore from "expo-secure-store";
-import api from "../services/api";
+import React, { createContext, useEffect, useState } from "react";
+import axios from "axios";
+import { useUser } from "../store/useUser";
+import Constants from "expo-constants";
+import { router } from "expo-router";
 
-type User = {
-  _id?: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-};
+const API_BASE =
+  Constants.expoConfig?.extra?.apiUrl ||
+  "https://mandal-cycle-pos-api.onrender.com";
 
-type AuthContextValue = {
-  user: User | null;
-  loading: boolean;
-  signIn: (identifier: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-};
-
-export const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  loading: false,
-  signIn: async () => {},
-  signOut: async () => {},
+export const AuthContext = createContext({
+  signIn: async (identifier: string, password: string) => {},
+  signOut: () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }: any) => {
+  const [loading, setLoading] = useState(false);
 
-  // load token & profile on start
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = await SecureStore.getItemAsync("authToken");
-        if (token) {
-          // fetch profile (adjust endpoint to your backend)
-          const res = await api.get("/api/auth/me");
-          setUser(res.data || null);
-        }
-      } catch (e) {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const setUser = useUser((s) => s.setUser);
 
   const signIn = async (identifier: string, password: string) => {
-    setLoading(true);
     try {
-      // backend should return { token, user }
-      const res = await api.post("/api/auth/login", { identifier, password });
-      const token = res.data?.token;
-      const userData = res.data?.user || null;
+      setLoading(true);
 
-      if (!token) throw new Error("No token from server");
+      console.log("🔐 Logging in…", identifier);
 
-      await SecureStore.setItemAsync("authToken", token);
-      setUser(userData);
-    } catch (err) {
-      // rethrow so UI can show error
+      const api = axios.create({
+        baseURL: API_BASE,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const response = await api.post("/auth/login", {
+        email: identifier,
+        password,
+      });
+
+      console.log("🔥 Login response:", response.data);
+
+      if (!response.data.token) {
+        throw new Error("Token missing in login response");
+      }
+
+      // save user globally
+      setUser({
+        _id: response.data.user?._id,
+        name: response.data.user?.name,
+        email: response.data.user?.email,
+        token: response.data.token,
+      });
+
+      console.log("✅ User saved to store");
+
+      // redirect to dashboard
+      router.replace("/");
+    } catch (err: any) {
+      console.log("❌ Login API error:", err.response?.data || err.message);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const signOut = async () => {
-    setLoading(true);
-    try {
-      await SecureStore.deleteItemAsync("authToken");
-      setUser(null);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+  const signOut = () => {
+    setUser(null);
+    router.replace("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};

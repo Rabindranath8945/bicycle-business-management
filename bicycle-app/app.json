@@ -46,7 +46,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": "https://mandal-cycle-pos-api.onrender.com/api"
+      "apiUrl": "https://mandal-cycle-pos-api.onrender.com"
     }
   }
 }
