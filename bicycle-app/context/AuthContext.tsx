@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useState } from "react";
 import axios from "axios";
 import { useUser } from "../store/useUser";
 import Constants from "expo-constants";
@@ -8,54 +8,62 @@ const API_BASE =
   Constants.expoConfig?.extra?.apiUrl ||
   "https://mandal-cycle-pos-api.onrender.com";
 
-export const AuthContext = createContext({
-  signIn: async (identifier: string, password: string) => {},
+type AuthContextType = {
+  signIn: (identifier: string, password: string) => Promise<void>;
+  signOut: () => void;
+};
+
+export const AuthContext = createContext<AuthContextType>({
+  signIn: async () => {},
   signOut: () => {},
 });
 
 export const AuthProvider = ({ children }: any) => {
   const [loading, setLoading] = useState(false);
-
   const setUser = useUser((s) => s.setUser);
 
   const signIn = async (identifier: string, password: string) => {
+    console.log("🟣 signIn() started");
     try {
       setLoading(true);
 
-      console.log("🔐 Logging in…", identifier);
+      console.log("📡 Sending login request:", API_BASE);
 
       const api = axios.create({
         baseURL: API_BASE,
         headers: { "Content-Type": "application/json" },
       });
 
-      const response = await api.post("/auth/login", {
+      const res = await api.post("/auth/login", {
         email: identifier,
         password,
       });
 
-      console.log("🔥 Login response:", response.data);
+      console.log("🟢 Login response:", res.data);
 
-      if (!response.data.token) {
-        throw new Error("Token missing in login response");
+      const user = res.data.user;
+      const token = res.data.token;
+
+      if (!token || !user) {
+        throw new Error("Invalid login response");
       }
 
-      // save user globally
+      // Save user to your global store
       setUser({
-        _id: response.data.user?._id,
-        name: response.data.user?.name,
-        email: response.data.user?.email,
-        token: response.data.token,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token,
       });
 
-      console.log("✅ User saved to store");
-
-      // redirect to dashboard
+      console.log("✅ User stored successfully");
       router.replace("/");
     } catch (err: any) {
-      console.log("❌ Login API error:", err.response?.data || err.message);
+      console.log("🔴 Login error:", err.response?.data || err.message);
       throw err;
     } finally {
+      console.log("🟡 signIn finished");
       setLoading(false);
     }
   };

@@ -1,126 +1,143 @@
-import React, { useEffect, useState } from "react";
+// app/products/index.tsx
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
-  Text,
   FlatList,
-  Image,
-  TouchableOpacity,
   StyleSheet,
+  RefreshControl,
+  Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
-import api from "../../services/api";
+import { Text, FAB, useTheme, Searchbar, IconButton } from "react-native-paper";
+import ProductCard from "../../components/ProductCard";
+import { useProductsApi, Product } from "../../hooks/useProductsApi";
+import {
+  GestureHandlerRootView,
+  Swipeable,
+} from "react-native-gesture-handler";
+import { router } from "expo-router";
 
-export default function ProductList() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+export default function ProductsListScreen() {
+  const theme = useTheme();
+  const { listProducts, deleteProduct } = useProductsApi();
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(
+    async (reset = false) => {
+      try {
+        if (reset) setPage(1);
+        setLoading(true);
+        const data = await listProducts(reset ? 1 : page, q);
+        setProducts((prev) => (reset ? data.items : [...prev, ...data.items]));
+      } catch (err) {
+        console.error("list products err", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [listProducts, page, q]
+  );
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    load(true);
+  }, [q]);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await api.get("/products");
-      setProducts(res.data);
-    } catch (err) {
-      console.log("fetchProducts error:", err);
-    } finally {
-      setLoading(false);
-    }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
   };
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <Image
-        source={{ uri: item.photo || "https://via.placeholder.com/80" }}
-        style={styles.img}
+  const onDelete = (id?: string) => {
+    if (!id) return;
+    Alert.alert("Delete product", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteProduct(id);
+            setProducts((p) => p.filter((x) => x._id !== id));
+          } catch (err) {
+            console.error(err);
+          }
+        },
+      },
+    ]);
+  };
+
+  const renderRight = (item: Product) => (
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <IconButton
+        icon="pencil"
+        onPress={() => router.push(`/products/${item._id}`)}
       />
-
-      <View style={{ flex: 1 }}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.category}>{item.categoryName}</Text>
-
-        <View
-          style={{ flexDirection: "row", marginTop: 6, alignItems: "center" }}
-        >
-          <Text style={styles.price}>₹{item.salePrice}</Text>
-
-          <Text style={[styles.stock, item.stock <= 3 && styles.lowStock]}>
-            Stock: {item.stock}
-          </Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        onPress={() => router.push(`/sales/new?product=${item._id}` as const)}
-        style={styles.addBtn}
-      >
-        <Text style={{ color: "#fff", fontWeight: "700" }}>Add</Text>
-      </TouchableOpacity>
+      <IconButton icon="delete" onPress={() => onDelete(item._id)} />
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <Text style={{ textAlign: "center" }}>Loading...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={{ flex: 1, padding: 12 }}>
-      <FlatList
-        data={products}
-        keyExtractor={(item) => item._id}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-      />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
+        <Searchbar
+          placeholder="Search products"
+          value={q}
+          onChangeText={setQ}
+          style={styles.search}
+        />
+
+        <FlatList
+          data={products}
+          keyExtractor={(i) => i._id || Math.random().toString()}
+          renderItem={({ item }) => (
+            <Swipeable renderRightActions={() => renderRight(item)}>
+              <ProductCard
+                name={item.name}
+                sku={item.sku}
+                salePrice={item.salePrice}
+                stock={item.stock}
+                photo={item.photo}
+                onPress={() => router.push(`/products/${item._id}`)}
+                onEdit={() => router.push(`/products/${item._id}`)}
+                onDelete={() => onDelete(item._id)}
+              />
+            </Swipeable>
+          )}
+          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onEndReached={() => {
+            setPage((p) => p + 1);
+            load();
+          }}
+          onEndReachedThreshold={0.5}
+        />
+
+        <FAB
+          icon="plus"
+          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          onPress={() => router.push("/products/new")}
+        />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    padding: 12,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    elevation: 3,
-    alignItems: "center",
-  },
-  img: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
-    marginRight: 12,
-  },
-  name: {
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  category: {
-    color: "#6b7280",
-    fontSize: 13,
-  },
-  price: {
-    fontWeight: "700",
-    color: "#059669",
-    marginRight: 12,
-  },
-  stock: {
-    color: "#6b7280",
-    fontSize: 12,
-  },
-  lowStock: {
-    color: "#dc2626",
-    fontWeight: "700",
-  },
-  addBtn: {
-    backgroundColor: "#059669",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+  container: { flex: 1 },
+  search: { margin: 12, marginBottom: 0 },
+  fab: {
+    position: "absolute",
+    right: 16,
+    bottom: 28,
+    borderRadius: 28,
+    elevation: 6,
   },
 });

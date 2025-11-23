@@ -1,10 +1,11 @@
 import { create } from "zustand";
 
-type User = {
+export type User = {
   _id: string;
   name: string;
   email: string;
   token: string;
+  role: string; // <-- ADD THIS
 };
 
 type Store = {

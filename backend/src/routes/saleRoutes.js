@@ -13,6 +13,38 @@ const router = express.Router();
 /* -----------------------------
    DASHBOARD ENDPOINTS
 ------------------------------ */
+router.get("/top-products", protect, async (req, res) => {
+  const top = await Sale.aggregate([
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.productId",
+        qtySold: { $sum: "$items.qty" },
+      },
+    },
+    { $sort: { qtySold: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "product",
+      },
+    },
+    { $unwind: "$product" },
+    {
+      $project: {
+        _id: 1,
+        name: "$product.name",
+        qtySold: 1,
+        img: "$product.photo",
+      },
+    },
+  ]);
+
+  res.json(top);
+});
 
 // TODAY'S TOTAL SALES
 router.get("/today", protect, async (req, res) => {

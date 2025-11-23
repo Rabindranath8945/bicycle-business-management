@@ -3,15 +3,19 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
+      "@/*": ["./*"]
+    },
+
+    // ⭐ REQUIRED FOR JSX TO WORK ⭐
+    "jsx": "react-jsx",
+    "lib": ["esnext", "dom"],
+
+    // ensure react & RN types load
+    "types": ["react", "react-native"],
+
+    "allowJs": true,
+    "skipLibCheck": true,
+    "noEmit": true
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

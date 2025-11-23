@@ -1,3 +1,4 @@
+// hooks/useApi.ts
 import axios from "axios";
 import Constants from "expo-constants";
 import { useUser } from "../store/useUser";
@@ -7,26 +8,20 @@ const API_BASE =
   "https://mandal-cycle-pos-api.onrender.com";
 
 export const useApi = () => {
+  const token = useUser((s) => s.user?.token);
+
   const instance = axios.create({
-    baseURL: API_BASE,
+    baseURL: API_BASE + "/api",
+    withCredentials: true,
     headers: {
       "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
     },
-  });
-
-  // 🔐 AUTO ADD TOKEN
-  instance.interceptors.request.use((config) => {
-    const token = useUser.getState().user?.token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
   });
 
   return instance;
 };
 
-// Dashboard API
 export const useDashboardApi = () => {
   const api = useApi();
 
@@ -40,12 +35,22 @@ export const useDashboardApi = () => {
         api.get("/sales/recent?limit=5"),
       ]);
 
+    // OPTIONAL: fetch top-selling products (create API below)
+    let topProducts: any[] = [];
+    try {
+      const top = await api.get("/sales/top-products");
+      topProducts = top.data;
+    } catch (e) {
+      topProducts = [];
+    }
+
     return {
-      productCount: products.data.count,
-      salesToday: salesToday.data.total,
-      categoryCount: categories.data.count,
-      lowStockCount: lowStock.data.count,
-      recentSales: recent.data,
+      productCount: products.data.count || 0,
+      salesToday: salesToday.data.total || 0,
+      categoryCount: categories.data.count || 0,
+      lowStockCount: lowStock.data.count || 0,
+      recentSales: recent.data || [],
+      topProducts,
     };
   };
 

@@ -64,7 +64,7 @@ export default function AuthProvider({
 
       // Logged in & on login page → move to dashboard
       if (user && pathname === "/login") {
-        router.replace("/dashboard");
+        router.replace("/");
       }
     }
   }, [loading, user, pathname, router]);
@@ -73,7 +73,7 @@ export default function AuthProvider({
   const login = async (email: string, password: string) => {
     await axios.post("/api/auth/login", { email, password });
     await fetchUser();
-    router.replace("/dashboard");
+    router.replace("/");
   };
 
   // Logout
