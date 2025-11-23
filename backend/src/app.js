@@ -23,6 +23,10 @@ const app = express();
 /* ✅ Allow localhost + production frontend */
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:8081", // Expo Web
+  "http://localhost:19006", // Expo DevTools
+  "http://127.0.0.1:8081",
+  "http://127.0.0.1:3000",
   "https://bicycle-datiuj2cl-rabindranath-mondals-projects.vercel.app",
   "https://bicycle-pos.vercel.app", // optional if you rename
 ];

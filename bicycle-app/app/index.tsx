@@ -1,141 +1,172 @@
-import React, { useContext } from "react";
 import {
   View,
   Text,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  RefreshControl,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { AuthContext } from "../context/AuthContext";
-
-// Icons (Expo Vector Icons)
 import { Ionicons } from "@expo/vector-icons";
+import * as Animatable from "react-native-animatable";
+import { useUser } from "../store/useUser";
+import { useEffect, useState } from "react";
+import { useDashboardApi } from "../hooks/useApi";
+import { BlurView } from "expo-blur";
+import { router } from "expo-router";
+
+type RecentSale = {
+  invoiceNo: string;
+  total: number;
+};
+
+type DashboardStats = {
+  productCount: number;
+  salesToday: number;
+  categoryCount: number;
+  lowStockCount: number;
+  recentSales: RecentSale[];
+};
+
+type GlassCardProps = {
+  title: string;
+  value: string | number;
+  delay?: number;
+};
+
+type ActionButtonProps = {
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+  onPress: () => void;
+};
 
 export default function Dashboard() {
-  const router = useRouter();
-  const { user } = useContext(AuthContext);
+  const user = useUser((s) => s.user);
+  const { getDashboardStats } = useDashboardApi();
+
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    productCount: 0,
+    salesToday: 0,
+    categoryCount: 0,
+    lowStockCount: 0,
+    recentSales: [],
+  });
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await getDashboardStats();
+      setStats(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   return (
-    <ScrollView style={styles.container}>
-      {/* HEADER */}
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={loadData} />
+      }
+    >
+      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.welcome}>Hello,</Text>
-          <Text style={styles.username}>{user?.name || "User"} 👋</Text>
-        </View>
-
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={24} color="#fff" />
-        </View>
+        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.subtitle}>Welcome, {user?.name || "User"} 👋</Text>
       </View>
 
-      {/* STATS */}
+      {/* Summary Cards */}
       <View style={styles.row}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Today Sales</Text>
-          <Text style={styles.statValue}>₹12,540</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Items Sold</Text>
-          <Text style={styles.statValue}>48</Text>
-        </View>
+        <GlassCard title="Products" value={stats.productCount} delay={100} />
+        <GlassCard
+          title="Sales Today"
+          value={`₹ ${stats.salesToday}`}
+          delay={200}
+        />
       </View>
 
       <View style={styles.row}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Avg Bill</Text>
-          <Text style={styles.statValue}>₹261</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Profit</Text>
-          <Text style={styles.statValue}>₹3,850</Text>
-        </View>
+        <GlassCard title="Categories" value={stats.categoryCount} delay={300} />
+        <GlassCard title="Low Stock" value={stats.lowStockCount} delay={400} />
       </View>
 
-      {/* QUICK ACTIONS */}
+      {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
 
-      <View style={styles.actionGrid}>
-        <TouchableOpacity
-          style={styles.actionBtn}
+      <View style={styles.actions}>
+        <ActionButton
+          icon="add-circle"
+          text="Add Sale"
           onPress={() => router.push("/sales/new")}
-        >
-          <Ionicons name="cart" size={28} color="#16a34a" />
-          <Text style={styles.actionLabel}>New Sale</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push("/products")}
-        >
-          <Ionicons name="cube" size={28} color="#16a34a" />
-          <Text style={styles.actionLabel}>Products</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push("/sales/index")}
-        >
-          <Ionicons name="receipt" size={28} color="#16a34a" />
-          <Text style={styles.actionLabel}>History</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push("/customers/index")}
-        >
-          <Ionicons name="people" size={28} color="#16a34a" />
-          <Text style={styles.actionLabel}>Customers</Text>
-        </TouchableOpacity>
+        />
+        <ActionButton
+          icon="add"
+          text="Add Product"
+          onPress={() => router.push("/products/new")}
+        />
+        <ActionButton
+          icon="grid-outline"
+          text="Add Category"
+          onPress={() => router.push("/products/new")}
+        />
       </View>
 
-      {/* RECENT SALES */}
+      {/* Recent Sales */}
       <Text style={styles.sectionTitle}>Recent Sales</Text>
 
-      {[1, 2, 3, 4].map((i) => (
-        <TouchableOpacity key={i} style={styles.saleRow}>
-          <Ionicons name="document-text" size={22} color="#475569" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.saleItem}>Invoice #{1000 + i}</Text>
-            <Text style={styles.saleSub}>Today • ₹450</Text>
-          </View>
-        </TouchableOpacity>
+      {stats.recentSales.map((sale, i) => (
+        <BlurView intensity={40} tint="light" style={styles.saleItem} key={i}>
+          <Text style={styles.saleText}>Invoice #{sale.invoiceNo}</Text>
+          <Text style={styles.saleAmount}>₹ {sale.total}</Text>
+        </BlurView>
       ))}
-
-      {/* FLOATING BUTTON */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("/sales/new")}
-      >
-        <Ionicons name="add" size={34} color="#fff" />
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#f8fafc" },
+// Glass UI card component
+const GlassCard = ({ title, value, delay }: GlassCardProps) => (
+  <Animatable.View animation="fadeInUp" delay={delay} style={styles.cardWrap}>
+    <BlurView intensity={50} tint="light" style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.cardValue}>{value}</Text>
+    </BlurView>
+  </Animatable.View>
+);
 
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 25,
+// Action button component
+const ActionButton = ({ icon, text, onPress }: ActionButtonProps) => (
+  <TouchableOpacity style={styles.actionBtn} onPress={onPress}>
+    <Ionicons name={icon} size={30} color="#007aff" />
+    <Text style={styles.actionText}>{text}</Text>
+  </TouchableOpacity>
+);
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f7fb",
+    padding: 16,
   },
 
-  welcome: { fontSize: 16, color: "#64748b" },
-  username: { fontSize: 22, fontWeight: "700" },
+  header: {
+    marginBottom: 20,
+  },
 
-  avatar: {
-    backgroundColor: "#16a34a",
-    width: 42,
-    height: 42,
-    borderRadius: 50,
-    alignItems: "center",
-    justifyContent: "center",
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#222",
+  },
+
+  subtitle: {
+    fontSize: 16,
+    color: "#777",
+    marginTop: 4,
   },
 
   row: {
@@ -144,70 +175,80 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  statCard: {
+  cardWrap: {
     width: "48%",
-    padding: 18,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
   },
 
-  statLabel: { color: "#64748b", fontSize: 12 },
-  statValue: { fontSize: 20, fontWeight: "700", marginTop: 4 },
+  card: {
+    padding: 20,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    borderColor: "rgba(255, 255, 255, 0.4)",
+    borderWidth: 1,
+  },
+
+  cardTitle: {
+    color: "#555",
+    fontSize: 14,
+    marginBottom: 10,
+  },
+
+  cardValue: {
+    color: "#222",
+    fontSize: 24,
+    fontWeight: "700",
+  },
 
   sectionTitle: {
+    color: "#222",
     fontSize: 18,
-    fontWeight: "700",
-    marginTop: 22,
-    marginBottom: 12,
+    fontWeight: "600",
+    marginTop: 20,
+    marginBottom: 10,
   },
 
-  actionGrid: {
+  actions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 15,
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
 
   actionBtn: {
-    width: "45%",
+    width: "31%",
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-  },
-
-  actionLabel: { marginTop: 8, fontWeight: "600", color: "#1e293b" },
-
-  saleRow: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    padding: 14,
+    paddingVertical: 18,
     borderRadius: 14,
-    marginBottom: 10,
     alignItems: "center",
-    gap: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    elevation: 2,
   },
 
-  saleItem: { fontWeight: "600", fontSize: 14 },
-  saleSub: { color: "#64748b", fontSize: 12 },
+  actionText: {
+    color: "#333",
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "500",
+  },
 
-  fab: {
-    width: 70,
-    height: 70,
-    borderRadius: 50,
-    backgroundColor: "#16a34a",
-    position: "absolute",
-    bottom: 40,
-    right: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
+  saleItem: {
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+  },
+
+  saleText: {
+    color: "#333",
+    fontSize: 16,
+  },
+
+  saleAmount: {
+    color: "#007aff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 4,
   },
 });
