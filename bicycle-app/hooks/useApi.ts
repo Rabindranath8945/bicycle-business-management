@@ -4,7 +4,7 @@ import { useUser } from "../store/useUser";
 
 const API_BASE =
   Constants.expoConfig?.extra?.apiUrl ||
-  "https://mandal-cycle-pos-api.onrender.com/api"; // IMPORTANT: include /api
+  "https://mandal-cycle-pos-api.onrender.com";
 
 export const useApi = () => {
   const instance = axios.create({
@@ -14,8 +14,7 @@ export const useApi = () => {
     },
   });
 
-  // ⛔ Your old code DID NOT INCLUDE TOKEN for protected routes
-  // ✔ THIS fixes 401 errors
+  // 🔐 AUTO ADD TOKEN
   instance.interceptors.request.use((config) => {
     const token = useUser.getState().user?.token;
     if (token) {

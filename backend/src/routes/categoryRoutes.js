@@ -10,10 +10,16 @@ import Product from "../models/Product.js";
 
 const router = express.Router();
 
-// GET /api/categories
+// LIST ALL
 router.get("/", getCategories);
 
-// COUNT (Dashboard)
+// CREATE
+router.post("/", addCategory);
+
+// DELETE
+router.delete("/:id", deleteCategory);
+
+// CATEGORY COUNT
 router.get("/count", async (req, res) => {
   try {
     const count = await Category.countDocuments();
@@ -23,13 +29,7 @@ router.get("/count", async (req, res) => {
   }
 });
 
-// POST /api/categories
-router.post("/", addCategory);
-
-// DELETE /api/categories/:id
-router.delete("/:id", deleteCategory);
-
-// GET /api/categories/all-with-count
+// CATEGORY + PRODUCT COUNT
 router.get("/all-with-count", async (req, res) => {
   try {
     const categories = await Category.find().lean();

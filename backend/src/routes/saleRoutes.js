@@ -5,51 +5,38 @@ import {
   listSales,
   getByBarcode,
 } from "../controllers/saleController.js";
-import { protect } from "../middleware/authMiddleware.js"; // <— update path if needed
+import { protect } from "../middleware/authMiddleware.js";
+import Sale from "../models/Sale.js";
 
 const router = express.Router();
 
-// ================================
-// CREATE SALE
-// ================================
-router.post("/", protect, createSale);
+/* -----------------------------
+   DASHBOARD ENDPOINTS
+------------------------------ */
 
-// ================================
-// GET ALL SALES
-// ================================
-router.get("/", protect, listSales);
-
-// ================================
-// GET SINGLE SALE
-// ================================
-router.get("/:id", protect, getSale);
-
-// ================================
-// GET BY BARCODE
-// ================================
-router.get("/barcode/:code", getByBarcode);
-
-// GET TODAY SALES — Dashboard
+// TODAY'S TOTAL SALES
 router.get("/today", protect, async (req, res) => {
   try {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
 
-    const total = await Sale.aggregate([
+    const result = await Sale.aggregate([
       { $match: { createdAt: { $gte: start } } },
       { $group: { _id: null, total: { $sum: "$total" } } },
     ]);
 
-    res.json({ total: total[0]?.total || 0 });
+    res.json({ total: result[0]?.total || 0 });
   } catch (err) {
+    console.error("Today sales error:", err);
     res.status(500).json({ message: err.message });
   }
 });
 
-// RECENT 5 SALES — Dashboard
+// RECENT SALES (LIMIT 5)
 router.get("/recent", protect, async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 5;
+
     const recent = await Sale.find()
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -57,8 +44,25 @@ router.get("/recent", protect, async (req, res) => {
 
     res.json(recent);
   } catch (err) {
+    console.error("Recent sales error:", err);
     res.status(500).json({ message: err.message });
   }
 });
+
+/* -----------------------------
+   SALE CRUD
+------------------------------ */
+
+// CREATE SALE
+router.post("/", protect, createSale);
+
+// GET ALL SALES
+router.get("/", protect, listSales);
+
+// GET SINGLE SALE
+router.get("/:id", protect, getSale);
+
+// FIND BY BARCODE (no auth)
+router.get("/barcode/:code", getByBarcode);
 
 export default router;
