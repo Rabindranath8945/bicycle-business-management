@@ -4,17 +4,24 @@ import { useUser } from "../store/useUser";
 
 const API_BASE =
   Constants.expoConfig?.extra?.apiUrl ||
-  "https://mandal-cycle-pos-api.onrender.com";
+  "https://mandal-cycle-pos-api.onrender.com/api"; // IMPORTANT: include /api
 
 export const useApi = () => {
-  const token = useUser((s) => s.user?.token);
-
   const instance = axios.create({
     baseURL: API_BASE,
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
       "Content-Type": "application/json",
     },
+  });
+
+  // ⛔ Your old code DID NOT INCLUDE TOKEN for protected routes
+  // ✔ THIS fixes 401 errors
+  instance.interceptors.request.use((config) => {
+    const token = useUser.getState().user?.token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
   });
 
   return instance;

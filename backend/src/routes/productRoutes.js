@@ -27,6 +27,29 @@ router.get("/search", searchProducts);
 // BARCODE lookup (POS Scan Mode)
 router.get("/barcode/:code", getProductByBarcode);
 
+// COUNT (Dashboard)
+router.get("/count", async (req, res) => {
+  try {
+    const count = await Product.countDocuments();
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// LOW STOCK COUNT (Dashboard)
+router.get("/low-stock/count", async (req, res) => {
+  try {
+    const LOW_STOCK_LIMIT = 5; // customize
+    const count = await Product.countDocuments({
+      stock: { $lt: LOW_STOCK_LIMIT },
+    });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET ONE
 router.get("/:id", getProductById);
 

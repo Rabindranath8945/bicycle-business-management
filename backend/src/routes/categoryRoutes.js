@@ -13,6 +13,16 @@ const router = express.Router();
 // GET /api/categories
 router.get("/", getCategories);
 
+// COUNT (Dashboard)
+router.get("/count", async (req, res) => {
+  try {
+    const count = await Category.countDocuments();
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST /api/categories
 router.post("/", addCategory);
 
