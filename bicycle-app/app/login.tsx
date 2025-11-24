@@ -23,7 +23,7 @@ import {
 } from "react-native-paper";
 import { AuthContext } from "../context/AuthContext";
 
-const LOGO = require("../assets/logo.png");
+// const LOGO = require("../assets/logoNew.jpg");
 
 export default function LoginScreen() {
   const theme = useTheme();
@@ -79,7 +79,7 @@ export default function LoginScreen() {
           style={styles.cardWrap}
         >
           <BlurView intensity={60} tint="light" style={styles.headerGlass}>
-            <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+            {/* <Image source={LOGO} style={styles.logo} resizeMode="contain" /> */}
           </BlurView>
 
           <Animatable.View animation="fadeInUp" delay={200} style={styles.card}>

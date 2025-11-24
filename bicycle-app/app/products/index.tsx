@@ -1,143 +1,56 @@
 // app/products/index.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  RefreshControl,
-  Alert,
-} from "react-native";
-import { Text, FAB, useTheme, Searchbar, IconButton } from "react-native-paper";
-import ProductCard from "../../components/ProductCard";
-import { useProductsApi, Product } from "../../hooks/useProductsApi";
-import {
-  GestureHandlerRootView,
-  Swipeable,
-} from "react-native-gesture-handler";
-import { router } from "expo-router";
+import React from "react";
+import { View, Text, FlatList, StyleSheet } from "react-native";
+import { bankingTheme } from "../../theme/banking";
+import { Link } from "expo-router";
 
-export default function ProductsListScreen() {
-  const theme = useTheme();
-  const { listProducts, deleteProduct } = useProductsApi();
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [refreshing, setRefreshing] = useState(false);
+const mock = [
+  { id: "p1", name: "City Cycle A", price: 12500, stock: 5 },
+  { id: "p2", name: "Mountain Bike X", price: 25600, stock: 2 },
+  { id: "p3", name: 'Tube 26"', price: 250, stock: 48 },
+];
 
-  const load = useCallback(
-    async (reset = false) => {
-      try {
-        if (reset) setPage(1);
-        setLoading(true);
-        const data = await listProducts(reset ? 1 : page, q);
-        setProducts((prev) => (reset ? data.items : [...prev, ...data.items]));
-      } catch (err) {
-        console.error("list products err", err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [listProducts, page, q]
-  );
+export default function Products() {
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: 12,
+        backgroundColor: bankingTheme.colors.background,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "700" }}>Products</Text>
+        <Link href="/products/new">
+          <Text style={{ color: bankingTheme.colors.info }}>+ Add</Text>
+        </Link>
+      </View>
 
-  useEffect(() => {
-    load(true);
-  }, [q]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load(true);
-    setRefreshing(false);
-  };
-
-  const onDelete = (id?: string) => {
-    if (!id) return;
-    Alert.alert("Delete product", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteProduct(id);
-            setProducts((p) => p.filter((x) => x._id !== id));
-          } catch (err) {
-            console.error(err);
-          }
-        },
-      },
-    ]);
-  };
-
-  const renderRight = (item: Product) => (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <IconButton
-        icon="pencil"
-        onPress={() => router.push(`/products/${item._id}`)}
+      <FlatList
+        data={mock}
+        keyExtractor={(i) => i.id}
+        renderItem={({ item }) => (
+          <View
+            style={{
+              backgroundColor: "#fff",
+              padding: 12,
+              borderRadius: 10,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>{item.name}</Text>
+            <Text style={{ color: "#666" }}>
+              ₹ {item.price} • stock: {item.stock}
+            </Text>
+          </View>
+        )}
       />
-      <IconButton icon="delete" onPress={() => onDelete(item._id)} />
     </View>
   );
-
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-      >
-        <Searchbar
-          placeholder="Search products"
-          value={q}
-          onChangeText={setQ}
-          style={styles.search}
-        />
-
-        <FlatList
-          data={products}
-          keyExtractor={(i) => i._id || Math.random().toString()}
-          renderItem={({ item }) => (
-            <Swipeable renderRightActions={() => renderRight(item)}>
-              <ProductCard
-                name={item.name}
-                sku={item.sku}
-                salePrice={item.salePrice}
-                stock={item.stock}
-                photo={item.photo}
-                onPress={() => router.push(`/products/${item._id}`)}
-                onEdit={() => router.push(`/products/${item._id}`)}
-                onDelete={() => onDelete(item._id)}
-              />
-            </Swipeable>
-          )}
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          onEndReached={() => {
-            setPage((p) => p + 1);
-            load();
-          }}
-          onEndReachedThreshold={0.5}
-        />
-
-        <FAB
-          icon="plus"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          onPress={() => router.push("/products/new")}
-        />
-      </View>
-    </GestureHandlerRootView>
-  );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  search: { margin: 12, marginBottom: 0 },
-  fab: {
-    position: "absolute",
-    right: 16,
-    bottom: 28,
-    borderRadius: 28,
-    elevation: 6,
-  },
-});

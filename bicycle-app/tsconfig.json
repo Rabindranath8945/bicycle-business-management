@@ -11,7 +11,7 @@
     "lib": ["esnext", "dom"],
 
     // ensure react & RN types load
-    "types": ["react", "react-native"],
+    "types": ["react", "react-native", "@tanstack/react-query"],
 
     "allowJs": true,
     "skipLibCheck": true,
