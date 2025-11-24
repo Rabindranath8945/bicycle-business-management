@@ -1,23 +1,17 @@
 // app/index.tsx
 import React from "react";
-import {
-  ScrollView,
-  View,
-  StyleSheet,
-  Text,
-  SafeAreaView,
-  Platform,
-} from "react-native";
+import { ScrollView, View, StyleSheet, Text, Platform } from "react-native";
 import BankingHeader from "../components/BankingHeader";
 import NotificationsPanel from "../components/NotificationsPanel";
 import QuickActions from "../components/QuickActions";
 import DashboardExtra from "../components/DashboardExtra";
 import BottomNav from "../components/BottomNav";
 import { bankingTheme } from "../theme/banking";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Dashboard() {
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <View style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}

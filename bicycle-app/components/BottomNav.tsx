@@ -1,73 +1,83 @@
+// components/BottomNav.tsx
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Link, usePathname } from "expo-router";
 import { bankingTheme } from "../theme/banking";
-import { IoniconName } from "../types/IoniconName";
-
-// const AVATAR = require("../assets/avatar_profile.jpg");
-
-interface TabItemProps {
-  icon: IoniconName;
-  label: string;
-}
-
-function Tab({ icon, label }: TabItemProps) {
-  return (
-    <TouchableOpacity style={styles.tab}>
-      <Ionicons name={icon} size={22} color="#444" />
-      <Text style={styles.label}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
 
 export default function BottomNav() {
+  const pathname = usePathname?.() ?? "/";
+
+  const items = [
+    { label: "Home", icon: "home-outline", href: "/" },
+    { label: "Products", icon: "pricetags-outline", href: "/products" },
+    { label: "Sales", icon: "cart-outline", href: "/sales/new" },
+    { label: "Purchase", icon: "bag-handle-outline", href: "/purchase/new" },
+  ];
+
   return (
     <View style={styles.nav}>
-      <Tab icon="home-outline" label="Home" />
-      <Tab icon="cube-outline" label="Products" />
-      <Tab icon="cart-outline" label="Sales" />
-      <Tab icon="bag-handle-outline" label="Purchase" />
+      {items.map((it) => {
+        const active = pathname === it.href;
+        return (
+          <Link href={it.href} asChild key={it.href}>
+            <TouchableOpacity style={styles.item}>
+              <Ionicons
+                name={it.icon}
+                size={20}
+                color={active ? bankingTheme.colors.primary : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.label,
+                  { color: active ? bankingTheme.colors.primary : "#6B7280" },
+                ]}
+              >
+                {it.label}
+              </Text>
+            </TouchableOpacity>
+          </Link>
+        );
+      })}
 
-      <TouchableOpacity style={styles.avatarTab}>
-        <Ionicons name="person" size={20} color="#fff" />
-        <Text style={styles.label}>Me</Text>
-      </TouchableOpacity>
+      <Link href="/account" asChild>
+        <TouchableOpacity style={styles.item}>
+          <View
+            style={[
+              styles.avatarCircle,
+              { backgroundColor: bankingTheme.colors.primary },
+            ]}
+          >
+            <Ionicons name="person" size={18} color="#fff" />
+          </View>
+          <Text style={styles.label}>Account</Text>
+        </TouchableOpacity>
+      </Link>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   nav: {
-    height: 70,
+    height: 68,
     backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
+    zIndex: 999,
   },
-  tab: {
-    alignItems: "center",
-  },
-  label: {
-    fontSize: 11,
-    marginTop: 4,
-  },
-  avatarTab: {
-    alignItems: "center",
-  },
-  avatar: {
+  item: { alignItems: "center", justifyContent: "center" },
+  label: { fontSize: 11, marginTop: 4 },
+  avatarCircle: {
     width: 36,
     height: 36,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: bankingTheme.colors.primary,
-  },
-  avatarCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#4C5CEB",
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -135,6 +135,9 @@ export default function Sidebar({ closeSidebar }: SidebarProps) {
             ))}
           </View>
         ))}
+        <View style={styles.footer}>
+          <Text style={[styles.footerText]}>Powered by Bicycle · v1.0</Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -197,4 +200,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
   },
+  footer: { marginTop: 18, alignItems: "center" },
+  footerText: { color: "#94a3b8", fontSize: 12 },
 });
