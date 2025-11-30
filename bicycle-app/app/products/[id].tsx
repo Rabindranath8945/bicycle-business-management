@@ -1,4 +1,4 @@
-// app/products/edit/[id].tsx
+// app/products/[id].tsx
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -12,6 +12,7 @@ import {
   FlatList,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -19,17 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { bankingTheme } from "../../theme/banking";
 import BankingHeader from "../../components/BankingHeader";
 import BottomNav from "../../components/BottomNav";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router/build";
 
-/**
- * Edit Product Screen
- * - Sectioned form (Basic / Pricing / Inventory / Other)
- * - Product Number / SKU / Barcode are read-only
- * - Category uses a dropdown modal (same category list you requested)
- * - Uses bankingTheme, BankingHeader and BottomNav
- */
-
-// Use the same categories you confirmed
 const CATEGORIES = [
   "Tyre",
   "Tube",
@@ -46,140 +38,166 @@ const CATEGORIES = [
   "Bell",
 ];
 
-// helper: generate product number (for fallback)
-const genProductNumber = () => `P-${Math.random().toString(36).slice(2, 9)}`;
-
 export default function EditProductScreen() {
-  // If you pass product data via navigation params, read them:
-  // (expo-router/useLocalSearchParams was used in previous files — keep same approach)
-  const params = useLocalSearchParams() as Record<string, any>;
+  const { id } = useLocalSearchParams();
 
-  // Prefill from params if provided, else fallback to sample values.
-  const [productNumber] = useState<string>(
-    params.productNumber || genProductNumber()
-  );
-  const [sku] = useState<string>(
-    params.sku || `SKU-${Date.now().toString().slice(-6)}`
-  );
-  const [barcode] = useState<string>(params.barcode || `${Date.now()}`);
+  const [loading, setLoading] = useState(true);
 
-  const [name, setName] = useState<string>(params.name || "");
-  const [category, setCategory] = useState<string | null>(
-    params.category || null
-  );
-  const [purchasePrice, setPurchasePrice] = useState<string>(
-    params.purchasePrice ? String(params.purchasePrice) : ""
-  );
-  const [salePrice, setSalePrice] = useState<string>(
-    params.salePrice ? String(params.salePrice) : ""
-  );
-  const [wholesalePrice, setWholesalePrice] = useState<string>(
-    params.wholesalePrice ? String(params.wholesalePrice) : ""
-  );
-  const [stock, setStock] = useState<string>(
-    params.stock ? String(params.stock) : ""
-  );
-  const [unit, setUnit] = useState<string>(params.unit || "");
-  const [taxPct, setTaxPct] = useState<string>(
-    params.taxPct ? String(params.taxPct) : "0"
-  );
-  const [description, setDescription] = useState<string>(
-    params.description || ""
-  );
+  // backend fields
+  const [productNumber, setProductNumber] = useState("");
+  const [sku, setSku] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
 
-  const [imageUri, setImageUri] = useState<string | null>(params.image || null);
+  const [costPrice, setCostPrice] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+  const [wholesalePrice, setWholesalePrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [unit, setUnit] = useState("");
+  const [hsn, setHsn] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
-  // category dropdown modal state
-  const [catModalVisible, setCatModalVisible] = useState<boolean>(false);
+  const [catModalVisible, setCatModalVisible] = useState(false);
 
-  // Image picker
+  // ⭐ FETCH PRODUCT DETAILS FROM BACKEND
+  useEffect(() => {
+    async function loadProduct() {
+      try {
+        const res = await fetch(
+          `https://mandal-cycle-pos-api.onrender.com/api/products/${id}`
+        );
+
+        const json = await res.json();
+
+        if (!json.success) throw new Error("Invalid response");
+
+        const p = json.product;
+
+        // fill states
+        setName(p.name);
+        setSalePrice(String(p.salePrice));
+        setCostPrice(String(p.costPrice || ""));
+        setWholesalePrice(String(p.wholesalePrice || ""));
+        setStock(String(p.stock || ""));
+        setUnit(p.unit || "");
+        setHsn(p.hsn || "");
+        setDescription(p.description || "");
+
+        setProductNumber(p.productNumber || "");
+        setSku(p.sku || "");
+        setBarcode(p.barcode || "");
+        setCategoryId(p.categoryId || null);
+        setCategoryName(p.categoryName || null);
+
+        // image
+        if (p.photo) {
+          setImageUri(
+            `https://mandal-cycle-pos-api.onrender.com/uploads/${p.photo}`
+          );
+        }
+      } catch (err) {
+        console.log(err);
+        Alert.alert("Error", "Failed to load product");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProduct();
+  }, [id]);
+
   async function pickImage() {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert(
-          "Permission required",
-          "Allow access to photos to pick an image."
-        );
+        Alert.alert("Permission required", "Allow photo access.");
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
         allowsEditing: true,
-        aspect: [4, 3],
+        quality: 0.7,
       });
 
-      // new API: canceled + assets[]
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (!result.canceled && result.assets.length > 0) {
         setImageUri(result.assets[0].uri);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
       Alert.alert("Error", "Unable to pick image.");
     }
   }
 
-  // Save handler (replace with real API call)
-  function handleUpdate() {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Product name is required.");
-      return;
-    }
-    if (!category) {
-      Alert.alert("Validation", "Please choose a category.");
-      return;
-    }
+  // ⭐ UPDATE PRODUCT (POST to backend)
+  async function handleUpdate() {
+    try {
+      const payload = {
+        name,
+        sellingPrice: salePrice,
+        costPrice,
+        wholesalePrice,
+        stock,
+        unit,
+        hsn,
+        categoryId,
+      };
 
-    const payload = {
-      productNumber,
-      sku,
-      barcode,
-      name,
-      category,
-      purchasePrice: parseFloat(purchasePrice || "0"),
-      salePrice: parseFloat(salePrice || "0"),
-      wholesalePrice: parseFloat(wholesalePrice || "0"),
-      stock: parseFloat(stock || "0"),
-      unit,
-      taxPct: parseFloat(taxPct || "0"),
-      description,
-      image: imageUri,
-    };
+      const res = await fetch(
+        `https://mandal-cycle-pos-api.onrender.com/api/products/${id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
-    // Replace this with axios/fetch to update on server
-    console.log("Updating product:", payload);
-    Alert.alert("Updated", "Product updated successfully.");
+      const json = await res.json();
+
+      if (!json.success) throw new Error("Update failed");
+
+      Alert.alert("Success", "Product updated");
+    } catch (error) {
+      Alert.alert("Error", "Failed to update");
+    }
   }
 
-  // Delete handler (replace with API call)
+  // ⭐ DELETE PRODUCT
   function handleDelete() {
-    Alert.alert("Delete product", "Are you sure?", [
-      { text: "Cancel", style: "cancel" as const },
+    Alert.alert("Delete Product", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
-        style: "destructive" as const,
-        onPress: () => {
-          // TODO: call delete API
-          Alert.alert("Deleted", "Product has been deleted.");
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await fetch(
+              `https://mandal-cycle-pos-api.onrender.com/api/products/${id}`,
+              { method: "DELETE" }
+            );
+
+            Alert.alert("Deleted", "Product removed");
+          } catch (e) {
+            Alert.alert("Error", "Delete failed");
+          }
         },
       },
     ]);
   }
 
-  // Category modal apply (we set immediately when tapping)
-  function openCategoryModal() {
-    setCatModalVisible(true);
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator
+          size="large"
+          color={bankingTheme.colors.primary}
+          style={{ marginTop: 60 }}
+        />
+      </SafeAreaView>
+    );
   }
-  function closeCategoryModal() {
-    setCatModalVisible(false);
-  }
-
-  // Ensure modal does not hide behind bottom nav by using marginBottom in modal Box
-  useEffect(() => {
-    // no-op for now; left for future enhancements
-  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -190,17 +208,14 @@ export default function EditProductScreen() {
         <View style={styles.container}>
           <BankingHeader hideSales />
 
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* ---------- IMAGE VIEWER AT TOP ---------- */}
+          <ScrollView contentContainerStyle={styles.scroll}>
+            {/* image viewer */}
             <View style={styles.imageViewerWrap}>
               <Image
                 source={
                   imageUri
                     ? { uri: imageUri }
-                    : require("../../assets/product-placeholder.png") // fallback image
+                    : require("../../assets/product-placeholder.png")
                 }
                 style={styles.imageViewer}
               />
@@ -214,7 +229,7 @@ export default function EditProductScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* ---------- BASIC DETAILS ---------- */}
+            {/* BASIC DETAILS */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Basic Details</Text>
@@ -227,7 +242,6 @@ export default function EditProductScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* read-only codes row */}
               <View style={styles.codesRow}>
                 <View style={styles.codeBox}>
                   <Text style={styles.codeLabel}>Product No</Text>
@@ -245,57 +259,45 @@ export default function EditProductScreen() {
                 </View>
               </View>
 
-              {/* name */}
               <View style={{ marginTop: 12 }}>
                 <Text style={styles.label}>Product Name</Text>
                 <TextInput
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Enter product name"
-                  placeholderTextColor="#9ca3af"
                 />
               </View>
 
-              {/* category dropdown */}
               <View style={{ marginTop: 12 }}>
                 <Text style={styles.label}>Category</Text>
                 <TouchableOpacity
                   style={styles.picker}
-                  onPress={openCategoryModal}
+                  onPress={() => setCatModalVisible(true)}
                 >
-                  <Text
-                    style={[
-                      styles.pickerText,
-                      !category && { color: "#9ca3af" },
-                    ]}
-                  >
-                    {category || "Select category"}
+                  <Text style={styles.pickerText}>
+                    {categoryName || "Select category"}
                   </Text>
                   <Ionicons name="chevron-down" size={18} color="#94a3b8" />
                 </TouchableOpacity>
               </View>
 
-              {/* image preview small */}
-              {imageUri ? (
+              {imageUri && (
                 <Image source={{ uri: imageUri }} style={styles.previewImg} />
-              ) : null}
+              )}
             </View>
 
-            {/* ---------- PRICING ---------- */}
+            {/* PRICING */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Pricing</Text>
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={styles.label}>Purchase Price</Text>
+                  <Text style={styles.label}>Cost Price</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="numeric"
-                    value={purchasePrice}
-                    onChangeText={setPurchasePrice}
-                    placeholder="0.00"
-                    placeholderTextColor="#9ca3af"
+                    value={costPrice}
+                    onChangeText={setCostPrice}
                   />
                 </View>
 
@@ -308,12 +310,8 @@ export default function EditProductScreen() {
                     keyboardType="numeric"
                     value={salePrice}
                     onChangeText={setSalePrice}
-                    placeholder="0.00"
-                    placeholderTextColor="#9ca3af"
                   />
                 </View>
-
-                <View style={{ width: 10 }} />
               </View>
 
               <View style={{ marginTop: 10 }}>
@@ -323,13 +321,11 @@ export default function EditProductScreen() {
                   keyboardType="numeric"
                   value={wholesalePrice}
                   onChangeText={setWholesalePrice}
-                  placeholder="0.00"
-                  placeholderTextColor="#9ca3af"
                 />
               </View>
             </View>
 
-            {/* ---------- INVENTORY ---------- */}
+            {/* INVENTORY */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Inventory</Text>
 
@@ -341,8 +337,6 @@ export default function EditProductScreen() {
                     keyboardType="numeric"
                     value={stock}
                     onChangeText={setStock}
-                    placeholder="0"
-                    placeholderTextColor="#9ca3af"
                   />
                 </View>
 
@@ -354,82 +348,64 @@ export default function EditProductScreen() {
                     style={styles.input}
                     value={unit}
                     onChangeText={setUnit}
-                    placeholder="pcs / kg"
-                    placeholderTextColor="#9ca3af"
                   />
                 </View>
 
                 <View style={{ width: 10 }} />
 
                 <View style={styles.col}>
-                  <Text style={styles.label}>GST %</Text>
+                  <Text style={styles.label}>HSN</Text>
                   <TextInput
                     style={styles.input}
-                    keyboardType="numeric"
-                    value={taxPct}
-                    onChangeText={setTaxPct}
-                    placeholder="0"
-                    placeholderTextColor="#9ca3af"
+                    value={hsn}
+                    onChangeText={setHsn}
                   />
                 </View>
               </View>
             </View>
 
-            {/* ---------- OTHER ---------- */}
+            {/* OTHER */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Other</Text>
 
-              <Text style={styles.label}>Description (optional)</Text>
+              <Text style={styles.label}>Description</Text>
               <TextInput
                 style={[
                   styles.input,
                   { height: 100, textAlignVertical: "top" },
                 ]}
                 value={description}
-                onChangeText={setDescription}
-                placeholder="Add description..."
-                placeholderTextColor="#9ca3af"
                 multiline
+                onChangeText={setDescription}
               />
             </View>
 
-            {/* bottom spacing so content not hidden behind bottom nav */}
             <View style={{ height: 120 }} />
           </ScrollView>
 
-          {/* SAVE / DELETE buttons fixed above BottomNav */}
+          {/* BUTTONS */}
           <View style={styles.footerBtns}>
             <TouchableOpacity style={styles.updateBtn} onPress={handleUpdate}>
-              <Ionicons
-                name="save-outline"
-                size={18}
-                color="#fff"
-                style={{ marginRight: 8 }}
-              />
+              <Ionicons name="save-outline" size={18} color="#fff" />
               <Text style={styles.updateText}>Update Product</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-              <Ionicons
-                name="trash-outline"
-                size={18}
-                color="#fff"
-                style={{ marginRight: 8 }}
-              />
+              <Ionicons name="trash-outline" size={18} color="#fff" />
               <Text style={styles.deleteText}>Delete</Text>
             </TouchableOpacity>
           </View>
 
           <BottomNav />
 
-          {/* ---------- Category Dropdown Modal ---------- */}
+          {/* CATEGORY MODAL */}
           {catModalVisible && (
             <View style={styles.modalWrap}>
               <View style={styles.modalBox}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Select Category</Text>
-                  <TouchableOpacity onPress={closeCategoryModal}>
-                    <Ionicons name="close" size={24} color="#111" />
+                  <TouchableOpacity onPress={() => setCatModalVisible(false)}>
+                    <Ionicons name="close" size={24} />
                   </TouchableOpacity>
                 </View>
 
@@ -437,12 +413,12 @@ export default function EditProductScreen() {
                   data={CATEGORIES}
                   keyExtractor={(i) => i}
                   renderItem={({ item }) => {
-                    const active = category === item;
+                    const active = categoryName === item;
                     return (
                       <TouchableOpacity
                         style={styles.catRow}
                         onPress={() => {
-                          setCategory(item);
+                          setCategoryName(item);
                           setCatModalVisible(false);
                         }}
                       >
@@ -461,24 +437,6 @@ export default function EditProductScreen() {
                     );
                   }}
                 />
-
-                <View style={styles.modalFooter}>
-                  <TouchableOpacity
-                    style={styles.clearBtn}
-                    onPress={() => {
-                      setCategory(null);
-                    }}
-                  >
-                    <Text style={styles.clearText}>Clear</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.applyBtn}
-                    onPress={() => setCatModalVisible(false)}
-                  >
-                    <Text style={styles.applyText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
           )}
@@ -487,6 +445,8 @@ export default function EditProductScreen() {
     </SafeAreaView>
   );
 }
+
+// ⭐ STYLES REMAIN EXACTLY SAME (NOT CHANGED)
 
 /* ---------------------- styles ---------------------- */
 const styles = StyleSheet.create({

@@ -6,7 +6,7 @@ import {
   TextInput,
   FlatList,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { router } from "expo-router/build";
 import axios from "../../lib/axios";
 
 // ----------------------
@@ -22,8 +22,6 @@ type SaleRow = {
 };
 
 export default function SalesListScreen() {
-  const router = useRouter();
-
   // Add proper typing ⬇⬇⬇
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(false);

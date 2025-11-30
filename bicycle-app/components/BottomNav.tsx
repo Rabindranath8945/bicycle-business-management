@@ -2,7 +2,7 @@
 import React from "react";
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, usePathname } from "expo-router";
+import { Link, usePathname } from "expo-router/build";
 import { bankingTheme } from "../theme/banking";
 
 export default function BottomNav() {

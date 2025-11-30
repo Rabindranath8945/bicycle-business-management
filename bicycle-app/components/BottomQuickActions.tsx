@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, Surface } from "react-native-paper";
-import { router } from "expo-router";
+import { router } from "expo-router/build";
 
 type BottomQuickActionsProps = {
   visible: boolean;

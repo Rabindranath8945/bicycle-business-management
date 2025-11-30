@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router/build";
 import { View, Text } from "react-native";
 
 export default function SaleDetails() {

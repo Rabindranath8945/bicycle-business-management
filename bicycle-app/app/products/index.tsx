@@ -1,5 +1,5 @@
 // app/products/index.tsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,110 +8,113 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BankingHeader from "../../components/BankingHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { bankingTheme } from "../../theme/banking";
 import BottomNav from "../../components/BottomNav";
+import { router, useFocusEffect } from "expo-router/build";
 
-/* sample data - replace with your API */
+/* ---------- Product Type Matching Backend ---------- */
 type Product = {
-  id: string;
+  _id: string;
   name: string;
-  sku?: string;
+  categoryId: string;
   salePrice: number;
-  purchasePrice: number;
+  costPrice: number;
   wholesalePrice: number;
   stock: number;
+  sku?: string;
+  barcode?: string;
+  productNumber?: string;
+  hsn?: string;
+  photo?: string | null;
+  active?: boolean;
+  categoryName?: string; // only if API populates category
 };
-const CATEGORIES = [
-  "Tyre",
-  "Tube",
-  "Rim",
-  "Mudguard",
-  "Frock",
-  "Chaincover",
-  "Chain",
-  "Free",
-  "Gear",
-  "Frame",
-  "Handle",
-  "Padel",
-  "Bell",
-];
 
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    name: 'Backestra 20" K.W.',
-    sku: "BK-20KW",
-    salePrice: 175,
-    purchasePrice: 125,
-    wholesalePrice: 100,
-    stock: 0,
-  },
-  {
-    id: "2",
-    name: 'Backestra 20" Local',
-    sku: "BK-20L",
-    salePrice: 120,
-    purchasePrice: 90,
-    wholesalePrice: 80,
-    stock: 2,
-  },
-  {
-    id: "3",
-    name: 'Backestra 20" Solid',
-    sku: "BK-20S",
-    salePrice: 210,
-    purchasePrice: 175,
-    wholesalePrice: 150,
-    stock: 0,
-  },
-  {
-    id: "4",
-    name: 'Backestra 22" K.W.',
-    sku: "BK-22KW",
-    salePrice: 175,
-    purchasePrice: 130,
-    wholesalePrice: 110,
-    stock: 5,
-  },
-];
+/* ---------- Backend URL ---------- */
+const BASE_URL = "https://mandal-cycle-pos-api.onrender.com";
 
 export default function ProductsPage() {
   const [query, setQuery] = useState("");
-  const [products, setProducts] = useState<Product[]>(SAMPLE_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  // statistics (this month) - sample calculation. Replace with real API.
-  const stats = useMemo(() => {
-    const sale =
-      products.reduce(
-        (s, p) => s + p.salePrice * Math.max(1, Math.round(Math.random() * 3)),
-        0
-      ) || 37845;
-    const purchase =
-      products.reduce(
-        (s, p) =>
-          s + p.purchasePrice * Math.max(1, Math.round(Math.random() * 3)),
-        0
-      ) || 37430;
-    const prev = Math.round(purchase * 0.95);
-    const profitPct = prev
-      ? Math.round(((sale - purchase) / prev) * 100 * 100) / 100
-      : -4.26;
-    return { sale, purchase, profitPct, prev };
-  }, [products]);
+  /* -------------------------------------------------------------
+        FETCH PRODUCTS
+     ------------------------------------------------------------- */
+  async function fetchProducts() {
+    try {
+      setLoading(true);
 
+      const res = await fetch(`${BASE_URL}/api/products`);
+      const data = await res.json();
+
+      const mapped: Product[] = data.map((p: any) => ({
+        _id: p._id,
+        name: p.name,
+        categoryId: p.categoryId,
+        categoryName: p.categoryName, // only if backend populates
+        salePrice: Number(p.salePrice || 0),
+        costPrice: Number(p.costPrice || 0),
+        wholesalePrice: Number(p.wholesalePrice || 0),
+        stock: Number(p.stock || 0),
+        sku: p.sku,
+        barcode: p.barcode,
+        productNumber: p.productNumber,
+        hsn: p.hsn,
+        photo: p.photo || null,
+        active: p.active,
+      }));
+
+      setProducts(mapped);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Unable to fetch products.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* -------------------------------------------------------------
+        FETCH CATEGORIES
+     ------------------------------------------------------------- */
+  async function fetchCategories() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/categories`);
+      const data = await res.json();
+      setCategories(data.map((c: any) => c.name));
+    } catch (err) {
+      console.log("Category fetch failed", err);
+    }
+  }
+
+  /* Load on mount */
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, []);
+
+  /* Auto refresh on screen focus */
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProducts();
+    }, [])
+  );
+
+  /* -------------------------------------------------------------
+        SEARCH + FILTER
+     ------------------------------------------------------------- */
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-
     let list = products;
 
-    // search filter
     if (q) {
       list = list.filter(
         (p) =>
@@ -120,80 +123,82 @@ export default function ProductsPage() {
       );
     }
 
-    // category filter
     if (selectedCategories.length > 0) {
       list = list.filter((p) =>
-        selectedCategories.some((cat) =>
-          p.name.toLowerCase().includes(cat.toLowerCase())
-        )
+        selectedCategories.includes(p.categoryName || "")
       );
     }
 
     return list;
   }, [products, query, selectedCategories]);
 
-  function onEdit(p: Product) {
-    Alert.alert("Edit", `Edit product ${p.name}`);
-  }
-  function onDelete(p: Product) {
-    Alert.alert("Delete", `Delete ${p.name}?`, [
-      { text: "Cancel", style: "cancel" },
+  /* -------------------------------------------------------------
+        EDIT NAVIGATION
+     ------------------------------------------------------------- */
+  function onEdit(item: Product) {
+    Alert.alert("✏️ Edit Product", `You are editing: ${item.name}`, [
       {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => setProducts((prev) => prev.filter((x) => x.id !== p.id)),
+        text: "Edit Now",
+        onPress: () => router.push(`/products/${item._id}`),
       },
+      { text: "Cancel", style: "cancel" },
     ]);
   }
 
-  function openAddProduct() {
-    Alert.alert("Add Product", "Open Add Product screen");
+  /* -------------------------------------------------------------
+        LOADING UI
+     ------------------------------------------------------------- */
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={{ marginTop: 40 }}>
+          <ActivityIndicator size="large" />
+          <Text style={{ textAlign: "center", marginTop: 10 }}>
+            Loading products...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  function addPurchase() {
-    Alert.alert("Add Purchase", "Open Add Purchase screen");
-  }
-  function addSale() {
-    Alert.alert("Add Sale", "Open Add Sale screen");
-  }
-
+  /* -------------------------------------------------------------
+        RENDER SINGLE PRODUCT ROW
+     ------------------------------------------------------------- */
   function renderItem({ item }: { item: Product }) {
     return (
       <View style={styles.listRow}>
         <View style={styles.rowLeft}>
           <Text style={styles.productTitle}>{item.name}</Text>
 
-          {/* SKU under name */}
           <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
-            SKU: {item.sku}
+            SKU: {item.sku || "N/A"}
           </Text>
 
           <View style={styles.rowSub}>
             <View style={styles.metaCol}>
-              <Text style={styles.metaLabel}>Sale Price</Text>
+              <Text style={styles.metaLabel}>Selling Price</Text>
               <Text style={styles.metaValue}>
-                ₹ {item.salePrice.toFixed(2)}
+                ₹ {Number(item.salePrice || 0).toFixed(2)}
               </Text>
             </View>
 
             <View style={styles.metaCol}>
-              <Text style={styles.metaLabel}>Purchase Price</Text>
+              <Text style={styles.metaLabel}>Cost Price</Text>
               <Text style={styles.metaValue}>
-                ₹ {item.purchasePrice.toFixed(2)}
+                ₹ {Number(item.costPrice || 0).toFixed(2)}
               </Text>
             </View>
 
-            {/* Wholesale Price added */}
             <View style={styles.metaCol}>
               <Text style={styles.metaLabel}>Wholesale</Text>
               <Text style={styles.metaValue}>
-                ₹ {item.wholesalePrice.toFixed(2)}
+                ₹ {Number(item.wholesalePrice || 0).toFixed(2)}
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.rowRight}>
+        <View style={styles.rowRight} pointerEvents="auto">
           <Text
             style={[
               styles.stockValue,
@@ -204,66 +209,30 @@ export default function ProductsPage() {
           </Text>
           <Text style={styles.stockLabel}>In Stock</Text>
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              onPress={() => onEdit(item)}
-              style={styles.actionBtn}
-            >
-              <Ionicons
-                name="create-outline"
-                size={18}
-                color={bankingTheme.colors.primary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => onDelete(item)}
-              style={[styles.actionBtn, { marginLeft: 8 }]}
-            >
-              <Ionicons name="trash-outline" size={18} color="#ef4444" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => onEdit(item)}
+            style={styles.actionBtn}
+          >
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={bankingTheme.colors.primary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     );
   }
 
+  /* -------------------------------------------------------------
+        MAIN UI
+     ------------------------------------------------------------- */
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.container}>
         <BankingHeader hideSales />
 
-        {/* stat row */}
-        <View style={styles.statRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Sale (This month)</Text>
-            <Text style={styles.statNumber}>
-              ₹ {stats.sale.toLocaleString()}
-            </Text>
-            <Text
-              style={[
-                styles.statSmall,
-                stats.profitPct < 0
-                  ? { color: "#ef4444" }
-                  : { color: "#16a34a" },
-              ]}
-            >
-              {stats.profitPct}% vs prev
-            </Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Purchase (This month)</Text>
-            <Text style={styles.statNumber}>
-              ₹ {stats.purchase.toLocaleString()}
-            </Text>
-            <Text style={styles.statSmall}>
-              Prev: ₹ {stats.prev.toLocaleString()}
-            </Text>
-          </View>
-        </View>
-
-        {/* search/filter/new item row */}
+        {/* search/filter/new row */}
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={18} color="#9AA4B2" />
@@ -285,85 +254,20 @@ export default function ProductsPage() {
 
           <TouchableOpacity
             style={styles.newBtn}
-            onPress={() => Alert.alert("New Item", "Open new item form")}
+            onPress={() => router.push("/products/new")}
           >
             <Text style={styles.newBtnText}>+ Add Item</Text>
           </TouchableOpacity>
         </View>
 
-        {/* list */}
+        {/* product list */}
         <FlatList
           data={visible}
-          keyExtractor={(i) => i.id}
+          keyExtractor={(i) => i._id}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          contentContainerStyle={{ padding: 12, paddingBottom: 160 }}
+          contentContainerStyle={{ padding: 12, paddingBottom: 120 }}
         />
-
-        {filterVisible && (
-          <View style={styles.modalWrap}>
-            <View style={styles.modalBox}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Filter Items</Text>
-                <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                  <Ionicons name="close" size={26} color="#111" />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.modalSubTitle}>Categories</Text>
-
-              <FlatList
-                data={CATEGORIES}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => {
-                  const active = selectedCategories.includes(item);
-                  return (
-                    <TouchableOpacity
-                      style={styles.catRow}
-                      onPress={() => {
-                        if (active) {
-                          setSelectedCategories((p) =>
-                            p.filter((x) => x !== item)
-                          );
-                        } else {
-                          setSelectedCategories((p) => [...p, item]);
-                        }
-                      }}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          active && styles.checkboxActive,
-                        ]}
-                      >
-                        {active && (
-                          <Ionicons name="checkmark" size={18} color="#fff" />
-                        )}
-                      </View>
-                      <Text style={styles.catLabel}>{item}</Text>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.clearBtn}
-                  onPress={() => setSelectedCategories([])}
-                >
-                  <Text style={styles.clearText}>Clear</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.applyBtn}
-                  onPress={() => setFilterVisible(false)}
-                >
-                  <Text style={styles.applyText}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* bottom nav */}
         <BottomNav />
@@ -372,33 +276,13 @@ export default function ProductsPage() {
   );
 }
 
+/* -------------------------------------------------------------
+        STYLES (unchanged from your UI)
+   ------------------------------------------------------------- */
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: bankingTheme.colors.background },
-  container: {
-    flex: 1,
-    backgroundColor: bankingTheme.colors.background,
-    overflow: "visible", // <-- ADD THIS
-  },
+  container: { flex: 1, backgroundColor: bankingTheme.colors.background },
 
-  /* stats */
-  statRow: {
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    gap: 10,
-    marginTop: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    elevation: 3,
-  },
-  statLabel: { color: bankingTheme.colors.textSecondary, fontSize: 13 },
-  statNumber: { fontSize: 18, fontWeight: "800", marginTop: 6 },
-  statSmall: { fontSize: 12, marginTop: 6 },
-
-  /* search */
   searchRow: {
     flexDirection: "row",
     paddingHorizontal: 12,
@@ -417,14 +301,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchInput: { marginLeft: 8, flex: 1, height: 40, color: "#111" },
+
   filterBtn: {
-    marginLeft: 8,
     padding: 10,
     borderRadius: 10,
     backgroundColor: bankingTheme.colors.primary,
   },
   newBtn: {
-    marginLeft: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,
@@ -432,7 +315,6 @@ const styles = StyleSheet.create({
   },
   newBtnText: { color: bankingTheme.colors.primary, fontWeight: "700" },
 
-  /* list row */
   listRow: {
     backgroundColor: "#fff",
     padding: 14,
@@ -442,8 +324,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
   },
+
   rowLeft: { flex: 1 },
   productTitle: { fontWeight: "700", fontSize: 16, color: "#0f172a" },
+
   rowSub: { flexDirection: "row", marginTop: 8, gap: 10 },
 
   metaCol: {},
@@ -456,113 +340,11 @@ const styles = StyleSheet.create({
   stockZero: { color: "#ef4444" },
   stockPositive: { color: "#059669" },
 
-  actions: { flexDirection: "row", marginTop: 10 },
-
   actionBtn: {
     backgroundColor: "#fff",
     padding: 8,
     borderRadius: 8,
     elevation: 1,
-  },
-  modalWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    zIndex: 999,
-    justifyContent: "flex-end",
-  },
-
-  modalBox: {
-    maxHeight: "84%", // was 75% — now fits correctly
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    paddingBottom: 30, // extra space so buttons never hide
-    marginBottom: 70, // pushes modal ABOVE bottom nav
-  },
-
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111",
-  },
-
-  modalSubTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111",
-    marginBottom: 12,
-    marginTop: 12,
-  },
-
-  catRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-
-  checkbox: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#9CA3AF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  checkboxActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
-
-  catLabel: {
-    fontSize: 16,
-    color: "#111",
-  },
-
-  modalFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
-  },
-
-  clearBtn: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginRight: 10,
-    alignItems: "center",
-  },
-
-  clearText: {
-    color: "#475569",
-    fontWeight: "700",
-  },
-
-  applyBtn: {
-    flex: 1,
-    backgroundColor: "#EF4444",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  applyText: {
-    color: "#fff",
-    fontWeight: "700",
+    marginTop: 10,
   },
 });

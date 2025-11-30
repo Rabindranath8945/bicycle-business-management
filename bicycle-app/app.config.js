@@ -12,6 +12,7 @@ export default {
     newArchEnabled: false,
 
     android: {
+      package: "com.bicycle.app",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -24,6 +25,13 @@ export default {
 
     experiments: {
       typedRoutes: true,
+    },
+
+    /* ✅ REQUIRED FOR EAS BUILD */
+    extra: {
+      eas: {
+        projectId: "73d73d7c-a021-4c89-b102-ac733a8ec304",
+      },
     },
   },
 };

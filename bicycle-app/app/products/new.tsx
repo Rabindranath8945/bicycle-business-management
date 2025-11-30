@@ -1,5 +1,5 @@
 // app/products/add.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,55 +19,70 @@ import BottomNav from "../../components/BottomNav";
 import { Ionicons } from "@expo/vector-icons";
 import { bankingTheme } from "../../theme/banking";
 
-/* --- helper generators --- */
-const genSKU = (name = "") =>
-  `SKU-${(name || "ITEM").slice(0, 3).toUpperCase()}-${Math.floor(
-    Math.random() * 9000 + 1000
-  )}`;
+/* HOOK FOR SAFE CATEGORY FETCH */
+import useCategories from "../../hooks/useCategories";
 
-const genBarcode = () => `${Date.now().toString().slice(-12)}`;
+/* BACKEND BASE URL */
+const BASE_URL = "https://mandal-cycle-pos-api.onrender.com";
 
-const genProductNumber = () => `P-${Math.random().toString(36).slice(2, 9)}`;
+/* ----- FRONTEND COPIES YOUR BACKEND LOGIC EXACTLY ----- */
 
-/* --- small category list for demo, replace with API categories --- */
-const CATEGORIES = [
-  "Tyre",
-  "Tube",
-  "Rim",
-  "Mudguard",
-  "Chain",
-  "Gear",
-  "Frame",
-  "Handle",
-];
+const generateBarcode = () => {
+  const part1 = Date.now().toString().slice(-6);
+  const part2 = Math.floor(100000 + Math.random() * 900000);
+  return `${part1}${part2}`;
+};
+
+const generateSKU = (name: string) => {
+  const prefix = name.trim().substring(0, 3).toUpperCase() || "SKU";
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}-${random}`;
+};
+
+const generateProductNumber = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const random = Math.floor(100 + Math.random() * 900);
+  return `PRD${y}${m}${d}-${random}`;
+};
 
 export default function AddProductScreen() {
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [sku, setSku] = useState(genSKU());
-  const [barcode, setBarcode] = useState(genBarcode());
-  const [productNumber, setProductNumber] = useState(genProductNumber());
+  /* Category data from backend using stable hook */
+  const { categories, loading: catLoading } = useCategories();
 
-  const [sellingPrice, setSellingPrice] = useState<string>("");
-  const [costPrice, setCostPrice] = useState<string>("");
-  const [wholesalePrice, setWholesalePrice] = useState<string>("");
-  const [stock, setStock] = useState<string>("");
-  const [unit, setUnit] = useState<string>("");
-  const [hsn, setHsn] = useState<string>("");
+  /* Form Fields */
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+
+  const [sellingPrice, setSellingPrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
+  const [wholesalePrice, setWholesalePrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [unit, setUnit] = useState("");
+  const [hsn, setHsn] = useState("");
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  /* Image picker */
+  /* Auto Codes */
+  const [sku, setSku] = useState(generateSKU(""));
+  const [barcode, setBarcode] = useState(generateBarcode());
+  const [productNumber, setProductNumber] = useState(generateProductNumber());
+
+  /* Auto-regenerate SKU when name changes */
+  useEffect(() => {
+    setSku(generateSKU(name));
+  }, [name]);
+
+  /* Pick Image */
   async function pickImage() {
     try {
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
-          "Permission required",
-          "Permission to access photos is required to upload product image."
-        );
+        Alert.alert("Permission needed", "Enable photo permission.");
         return;
       }
 
@@ -82,52 +97,64 @@ export default function AddProductScreen() {
         setImageUri(result.assets[0].uri);
       }
     } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Could not open image picker.");
+      Alert.alert("Error", "Could not pick image");
     }
   }
 
-  /* Re-generate codes */
+  /* Regenerate Codes Manually */
   function regenerateCodes() {
-    setSku(genSKU(name || undefined));
-    setBarcode(genBarcode());
-    setProductNumber(genProductNumber());
+    setSku(generateSKU(name));
+    setBarcode(generateBarcode());
+    setProductNumber(generateProductNumber());
   }
 
-  /* Basic validation and mocked submit */
+  /* Submit Product */
   async function handleAddProduct() {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Please enter product name.");
-      return;
-    }
-    setLoading(true);
+    if (!name.trim()) return Alert.alert("Missing", "Enter product name");
+    if (!categoryId) return Alert.alert("Missing", "Select category");
+    if (!sellingPrice.trim())
+      return Alert.alert("Missing", "Enter selling price");
 
-    // Build payload (replace with API call)
-    const payload = {
-      name: name.trim(),
-      category,
-      sku,
-      barcode,
-      productNumber,
-      sellingPrice: parseFloat(sellingPrice || "0"),
-      costPrice: parseFloat(costPrice || "0"),
-      wholesalePrice: parseFloat(wholesalePrice || "0"),
-      stock: parseFloat(stock || "0"),
-      unit,
-      hsn,
-      image: imageUri ?? null,
-    };
+    try {
+      setLoading(true);
 
-    // Mock delay + response
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert("Product Added", `${payload.name} added successfully.`);
-      // Reset or navigate back
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("category", categoryId);
+      formData.append("sellingPrice", sellingPrice);
+      formData.append("costPrice", costPrice);
+      formData.append("wholesalePrice", wholesalePrice);
+      formData.append("stock", stock);
+      formData.append("unit", unit);
+      formData.append("hsn", hsn);
+
+      formData.append("sku", sku);
+
+      if (imageUri) {
+        formData.append("image", {
+          uri: imageUri,
+          name: "product.jpg",
+          type: "image/jpeg",
+        } as any);
+      }
+
+      const res = await fetch(`${BASE_URL}/api/products`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        Alert.alert("Error", data.message || "Failed to add product");
+        return;
+      }
+
+      Alert.alert("Success", "Product added successfully");
+
+      /* Reset Form */
       setName("");
-      setCategory(null);
-      setSku(genSKU());
-      setBarcode(genBarcode());
-      setProductNumber(genProductNumber());
+      setCategoryId(null);
       setSellingPrice("");
       setCostPrice("");
       setWholesalePrice("");
@@ -135,7 +162,14 @@ export default function AddProductScreen() {
       setUnit("");
       setHsn("");
       setImageUri(null);
-    }, 700);
+
+      regenerateCodes();
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -147,18 +181,16 @@ export default function AddProductScreen() {
         <View style={styles.container}>
           <BankingHeader hideSales />
 
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
+          <ScrollView contentContainerStyle={styles.scroll}>
             <View style={styles.card}>
+              {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.cardTitleWrap}>
                   <Ionicons
                     name="duplicate-outline"
                     size={18}
                     color={bankingTheme.colors.primary}
-                    style={{ marginRight: 8 }}
+                    style={{ marginRight: 6 }}
                   />
                   <Text style={styles.cardTitle}>Add New Product</Text>
                 </View>
@@ -171,7 +203,7 @@ export default function AddProductScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Product name */}
+              {/* Product Name */}
               <View style={styles.field}>
                 <Text style={styles.label}>Product Name</Text>
                 <TextInput
@@ -183,151 +215,150 @@ export default function AddProductScreen() {
                 />
               </View>
 
-              {/* Category / small select */}
-              <View style={[styles.row, { marginTop: 6 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Category</Text>
-                  <TouchableOpacity
-                    style={styles.picker}
-                    onPress={() => {
-                      const buttons = [
-                        ...CATEGORIES.map((c) => ({
-                          text: c,
-                          onPress: () => setCategory(c),
+              {/* Category */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Category</Text>
+
+                <TouchableOpacity
+                  style={styles.picker}
+                  onPress={() => {
+                    if (categories.length === 0) {
+                      Alert.alert(
+                        "No categories",
+                        "Add categories first in admin panel"
+                      );
+                      return;
+                    }
+
+                    Alert.alert(
+                      "Select Category",
+                      "",
+                      [
+                        ...categories.map((c) => ({
+                          text: c.name,
+                          onPress: () => setCategoryId(c._id),
                         })),
                         { text: "Cancel", style: "cancel" },
-                      ];
-
-                      Alert.alert("Select Category", "", [
-                        ...CATEGORIES.map((c) => ({
-                          text: c,
-                          onPress: () => setCategory(c),
-                        })),
-                        { text: "Cancel", style: "cancel" as const },
-                      ]);
-                    }}
+                      ],
+                      { cancelable: true }
+                    );
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerText,
+                      !categoryId && { color: "#9ca3af" },
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.pickerText,
-                        !category && { color: "#9ca3af" },
-                      ]}
-                    >
-                      {category || "Select category"}
-                    </Text>
-                    <Ionicons name="chevron-down" size={18} color="#94a3b8" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* three small auto boxes: SKU / Barcode / P# */}
-                <View style={{ width: 12 }} />
+                    {categoryId
+                      ? categories.find((c) => c._id === categoryId)?.name
+                      : "Select category"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color="#94a3b8" />
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.autoRow}>
-                <View style={styles.autoBox}>
-                  <Text style={styles.autoLabel}>SKU</Text>
-                  <Text style={styles.autoVal}>{sku}</Text>
-                </View>
-
-                <View style={styles.autoBox}>
-                  <Text style={styles.autoLabel}>Barcode</Text>
-                  <Text style={styles.autoVal}>{barcode}</Text>
-                </View>
-
-                <View style={styles.autoBox}>
-                  <Text style={styles.autoLabel}>Product No</Text>
-                  <Text style={styles.autoVal}>{productNumber}</Text>
-                </View>
+              {/* SKU */}
+              <View style={styles.field}>
+                <Text style={styles.label}>SKU</Text>
+                <TextInput
+                  value={sku}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
               </View>
 
-              {/* Prices row */}
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={styles.label}>Selling Price</Text>
-                  <TextInput
-                    placeholder="₹ 0.00"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="numeric"
-                    value={sellingPrice}
-                    onChangeText={setSellingPrice}
-                    style={styles.input}
-                  />
-                </View>
-
-                <View style={{ width: 10 }} />
-
-                <View style={styles.col}>
-                  <Text style={styles.label}>Cost Price</Text>
-                  <TextInput
-                    placeholder="₹ 0.00"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="numeric"
-                    value={costPrice}
-                    onChangeText={setCostPrice}
-                    style={styles.input}
-                  />
-                </View>
-
-                <View style={{ width: 10 }} />
-
-                <View style={styles.col}>
-                  <Text style={styles.label}>Wholesale Price</Text>
-                  <TextInput
-                    placeholder="₹ 0.00"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="numeric"
-                    value={wholesalePrice}
-                    onChangeText={setWholesalePrice}
-                    style={styles.input}
-                  />
-                </View>
+              {/* Barcode */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Barcode</Text>
+                <TextInput
+                  value={barcode}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
               </View>
 
-              {/* Stock / Unit / HSN */}
-              <View style={[styles.row, { marginTop: 10 }]}>
-                <View style={styles.col}>
-                  <Text style={styles.label}>Stock</Text>
-                  <TextInput
-                    placeholder="0"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="numeric"
-                    value={stock}
-                    onChangeText={setStock}
-                    style={styles.input}
-                  />
-                </View>
-
-                <View style={{ width: 10 }} />
-
-                <View style={styles.col}>
-                  <Text style={styles.label}>Unit</Text>
-                  <TextInput
-                    placeholder="pcs / kg"
-                    placeholderTextColor="#9ca3af"
-                    value={unit}
-                    onChangeText={setUnit}
-                    style={styles.input}
-                  />
-                </View>
-
-                <View style={{ width: 10 }} />
-
-                <View style={styles.col}>
-                  <Text style={styles.label}>HSN Code</Text>
-                  <TextInput
-                    placeholder="HSN"
-                    placeholderTextColor="#9ca3af"
-                    value={hsn}
-                    onChangeText={setHsn}
-                    style={styles.input}
-                  />
-                </View>
+              {/* Product Number */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Product Number</Text>
+                <TextInput
+                  value={productNumber}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
               </View>
 
-              {/* Image picker */}
-              <View style={{ marginTop: 14 }}>
+              {/* Prices */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Selling Price</Text>
+                <TextInput
+                  placeholder="₹ 0.00"
+                  keyboardType="numeric"
+                  value={sellingPrice}
+                  onChangeText={setSellingPrice}
+                  style={styles.input}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Cost Price</Text>
+                <TextInput
+                  placeholder="₹ 0.00"
+                  keyboardType="numeric"
+                  value={costPrice}
+                  onChangeText={setCostPrice}
+                  style={styles.input}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Wholesale Price</Text>
+                <TextInput
+                  placeholder="₹ 0.00"
+                  keyboardType="numeric"
+                  value={wholesalePrice}
+                  onChangeText={setWholesalePrice}
+                  style={styles.input}
+                />
+              </View>
+
+              {/* Stock */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Stock</Text>
+                <TextInput
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={stock}
+                  onChangeText={setStock}
+                  style={styles.input}
+                />
+              </View>
+
+              {/* Unit */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Unit</Text>
+                <TextInput
+                  placeholder="pcs / kg"
+                  value={unit}
+                  onChangeText={setUnit}
+                  style={styles.input}
+                />
+              </View>
+
+              {/* HSN */}
+              <View style={styles.field}>
+                <Text style={styles.label}>HSN Code</Text>
+                <TextInput
+                  placeholder="HSN"
+                  value={hsn}
+                  onChangeText={setHsn}
+                  style={styles.input}
+                />
+              </View>
+
+              {/* Image Picker */}
+              <View style={{ marginTop: 10 }}>
                 <Text style={styles.label}>Product Image</Text>
-
                 <View style={styles.imageRow}>
                   <TouchableOpacity
                     style={styles.imagePicker}
@@ -352,11 +383,7 @@ export default function AddProductScreen() {
 
                   <View style={{ width: 12 }} />
 
-                  <View style={{ flex: 1, justifyContent: "center" }}>
-                    <Text style={styles.hint}>
-                      Optional. Use clear, well-lit product images for better
-                      invoices & reports.
-                    </Text>
+                  <View style={{ flex: 1 }}>
                     <TouchableOpacity
                       onPress={pickImage}
                       style={styles.uploadBtn}
@@ -367,12 +394,12 @@ export default function AddProductScreen() {
                 </View>
               </View>
 
-              {/* action */}
+              {/* Submit Button */}
               <View style={{ marginTop: 18 }}>
                 <TouchableOpacity
-                  style={[styles.actionBtn, loading && { opacity: 0.7 }]}
-                  onPress={handleAddProduct}
+                  style={[styles.actionBtn, loading && { opacity: 0.6 }]}
                   disabled={loading}
+                  onPress={handleAddProduct}
                 >
                   <Ionicons
                     name="cube-outline"
@@ -387,7 +414,6 @@ export default function AddProductScreen() {
               </View>
             </View>
 
-            {/* bottom spacing so content above BottomNav */}
             <View style={{ height: 120 }} />
           </ScrollView>
 
@@ -398,137 +424,79 @@ export default function AddProductScreen() {
   );
 }
 
-/* ----------------- styles ----------------- */
+/* ---- STYLES (unchanged) ---- */
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: bankingTheme.colors.background },
-  container: { flex: 1, backgroundColor: bankingTheme.colors.background },
-
-  scroll: {
-    padding: 12,
-    paddingBottom: 20,
-  },
-
+  safe: { flex: 1, backgroundColor: "#f8fafc" },
+  container: { flex: 1 },
+  scroll: { padding: 14 },
   card: {
     backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 14,
-    elevation: 4,
-    // premium border
-    borderWidth: 1,
-    borderColor: "rgba(12,20,35,0.04)",
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
-
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 12,
   },
-  cardTitleWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: bankingTheme.colors.textPrimary,
-  },
+  cardTitleWrap: { flexDirection: "row", alignItems: "center" },
+  cardTitle: { fontSize: 18, fontWeight: "600" },
   smallAction: {
-    padding: 8,
+    backgroundColor: "#e5e7eb",
+    padding: 6,
     borderRadius: 8,
-    backgroundColor: "#fff",
-    elevation: 2,
   },
-
-  field: { marginTop: 6 },
-  label: { color: "#374151", fontWeight: "700", marginBottom: 6 },
+  field: { marginBottom: 10 },
+  label: { fontSize: 14, fontWeight: "500", marginBottom: 4 },
   input: {
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "ios" ? 12 : 8,
-    borderRadius: 10,
-    color: "#0f172a",
-    borderWidth: 1,
-    borderColor: "rgba(12,20,35,0.04)",
-  },
-
-  /* pickers + auto boxes */
-  picker: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "rgba(12,20,35,0.04)",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  pickerText: { fontSize: 14, color: "#0f172a" },
-
-  autoRow: {
-    flexDirection: "row",
-    marginTop: 12,
-    gap: 10,
-    justifyContent: "space-between",
-  },
-  autoBox: {
-    flex: 1,
-    backgroundColor: "#0f172a05",
+    backgroundColor: "#f1f5f9",
     padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(12,20,35,0.04)",
+    borderRadius: 8,
+    fontSize: 15,
   },
-  autoLabel: { color: "#6b7280", fontSize: 12, fontWeight: "700" },
-  autoVal: {
-    marginTop: 6,
-    fontWeight: "500",
-    fontSize: 11,
-    color: bankingTheme.colors.textPrimary,
+  disabledInput: {
+    backgroundColor: "#e2e8f0",
+    color: "#374151",
   },
-
-  /* rows / cols */
-  row: { flexDirection: "row", marginTop: 12 },
-  col: { flex: 1 },
-
-  /* images */
-  imageRow: { flexDirection: "row", marginTop: 8, alignItems: "center" },
+  picker: {
+    backgroundColor: "#f1f5f9",
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  pickerText: { fontSize: 15 },
+  imageRow: { flexDirection: "row", marginTop: 6 },
   imagePicker: {
     width: 110,
-    height: 90,
-    borderRadius: 8,
+    height: 110,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 10,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(12,20,35,0.04)",
-    backgroundColor: "#f8fafc",
-    alignItems: "center",
+  },
+  preview: { width: "100%", height: "100%" },
+  placeholder: {
+    flex: 1,
     justifyContent: "center",
-  },
-  preview: { width: "100%", height: "100%", resizeMode: "cover" },
-  placeholder: { alignItems: "center" },
-  placeholderText: { color: "#94a3b8", marginTop: 6 },
-
-  hint: { color: "#6b7280", fontSize: 13, marginBottom: 8 },
-
-  uploadBtn: {
-    backgroundColor: "rgba(11,105,245,0.08)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  uploadText: { color: bankingTheme.colors.primary, fontWeight: "700" },
-
-  /* action */
-  actionBtn: {
-    marginTop: 8,
-    backgroundColor: bankingTheme.colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
     alignItems: "center",
+  },
+  placeholderText: { fontSize: 13, marginTop: 4 },
+  uploadBtn: {
+    backgroundColor: "#e2e8f0",
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 20,
+  },
+  uploadText: { textAlign: "center", fontWeight: "500" },
+  actionBtn: {
+    backgroundColor: bankingTheme.colors.primary,
+    padding: 14,
+    borderRadius: 10,
     flexDirection: "row",
     justifyContent: "center",
   },
-  actionText: { color: "#fff", fontWeight: "800" },
+  actionText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

@@ -2,7 +2,7 @@ import React, { createContext, useState } from "react";
 import axios from "axios";
 import { useUser } from "../store/useUser";
 import Constants from "expo-constants";
-import { router } from "expo-router";
+import { router } from "expo-router/build";
 
 const API_BASE =
   Constants.expoConfig?.extra?.apiUrl ||

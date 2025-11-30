@@ -1,11 +1,11 @@
 // app/_layout.tsx
-import React from "react";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router/build";
 import AppShell from "../components/AppShell";
+
 export default function RootLayout() {
   return (
     <AppShell>
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }} />
     </AppShell>
   );
 }
