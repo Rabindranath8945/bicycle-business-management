@@ -1,18 +1,30 @@
-import mongoose from "mongoose";
+// models/Supplier.ts
+import mongoose, { Schema, model } from "mongoose";
 
-const supplierSchema = new mongoose.Schema(
+const SupplierSchema = new Schema(
   {
     name: { type: String, required: true },
-    companyName: { type: String },
-    phone: { type: String, required: true, unique: true },
-    email: { type: String },
-    address: { type: String },
-    gstNumber: { type: String },
-    openingBalance: { type: Number, default: 0 },
-    balanceType: { type: String, enum: ["credit", "debit"], default: "credit" },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    phone: String,
+    gstin: String,
+    email: String,
+    address: String,
+    opening_balance: { type: Number, default: 0 },
+    credit_limit: { type: Number, default: 0 },
+    ledger: [
+      {
+        type: {
+          type: String,
+          enum: ["purchase", "payment", "return", "adjustment"],
+          required: true,
+        },
+        amount: Number,
+        date: { type: Date, default: () => new Date() },
+        refId: String,
+        note: String,
+      },
+    ],
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Supplier", supplierSchema);
+export default mongoose.models.Supplier || model("Supplier", SupplierSchema);

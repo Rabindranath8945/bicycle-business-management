@@ -20,15 +20,24 @@ export default function Header() {
   const router = useRouter();
   const { toggleMobile } = useLayout();
 
-  // ----- ALL HOOKS AT TOP (SAFE) -----
+  // -------------------------
+  //   HOOK STATE
+  // -------------------------
   const [dark, setDark] = useState(false);
-  const [user, setUser] = useState<{
-    name?: string;
-    avatar?: string;
-    role?: string;
-  } | null>(null);
-
+  const [user, setUser] = useState<any>(null);
   const [now, setNow] = useState(new Date());
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // -------------------------
+  //   NOTIFICATIONS
+  // -------------------------
   const [notifications, setNotifications] = useState([
     {
       id: "n1",
@@ -39,15 +48,15 @@ export default function Header() {
     },
     {
       id: "n2",
-      title: "Low stock: Mountain X1",
-      body: "Only 2 left",
+      title: "Low stock alert",
+      body: "Only 2 left in Mountain X1",
       time: "1h",
       read: false,
     },
     {
       id: "n3",
       title: "Backup completed",
-      body: "Daily backup finished",
+      body: "Auto-backup done",
       time: "Yesterday",
       read: true,
     },
@@ -55,38 +64,68 @@ export default function Header() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const markAllRead = () =>
+    setNotifications((p) => p.map((n) => ({ ...n, read: true })));
 
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-
-  // ----- FETCH USER (SAFE, DOESN’T CHANGE HOOK ORDER) -----
+  // -------------------------
+  //   FETCH USER
+  // -------------------------
   useEffect(() => {
     fetcher("/api/auth/me")
       .then((data) => setUser(data || null))
       .catch(() => setUser(null));
   }, []);
 
-  // ----- CLOCK -----
+  // -------------------------
+  //   CLOCK
+  // -------------------------
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // ----- KEYBOARD SHORTCUTS -----
+  // -------------------------
+  //   SAVE THEME (NEW)
+  // -------------------------
+  useEffect(() => {
+    const stored = localStorage.getItem("theme-dark");
+    if (stored === "true") setDark(true);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("theme-dark", dark.toString());
+    if (dark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, [dark]);
+
+  // -------------------------
+  //   KEYBOARD SHORTCUTS
+  // -------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const isCmdK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k";
-      if (isCmdK) {
+      const key = e.key.toLowerCase();
+
+      // search modal
+      if ((e.metaKey || e.ctrlKey) && key === "k") {
         e.preventDefault();
-        setSearchOpen((prev) => {
-          const next = !prev;
-          if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
-          return next;
-        });
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
       }
-      if (e.key === "Escape") {
+
+      // notifications panel
+      if ((e.metaKey || e.ctrlKey) && key === "/") {
+        e.preventDefault();
+        setNotifOpen((prev) => !prev);
+      }
+
+      // quick add menu
+      if ((e.metaKey || e.ctrlKey) && key === "+") {
+        e.preventDefault();
+        setQuickAddOpen((prev) => !prev);
+      }
+
+      // close all
+      if (key === "escape") {
         setNotifOpen(false);
         setQuickAddOpen(false);
         setSearchOpen(false);
@@ -97,17 +136,49 @@ export default function Header() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ----- MARK ALL READ -----
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  // -------------------------
+  //   GLOBAL SEARCH (NEW)
+  // -------------------------
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    // mock search — replace with API
+    const data = [
+      { type: "Product", name: "Hero Cycle", id: 1 },
+      { type: "Customer", name: "Ramesh", id: 2 },
+      { type: "Invoice", name: "INV-1040", id: 3 },
+      { type: "Supplier", name: "Rama Enterprise", id: 4 },
+    ];
+
+    const results = data.filter((item) =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    setSearchResults(results);
+  }, [searchQuery]);
+
+  // -------------------------
+  //   QUICK ADD HANDLER
+  // -------------------------
+  const handleQuickAdd = (type: string) => {
+    const routeMap: any = {
+      sale: "/sales/new",
+      purchase: "/purchases/new",
+      expense: "/expenses/new",
+      customer: "/customers/new",
+      supplier: "/suppliers/new",
+      product: "/products/new",
+    };
+
+    if (routeMap[type]) router.push(routeMap[type]);
   };
 
-  // ----- QUICK ADD -----
-  const handleQuickAdd = (type: "sale" | "purchase" | "expense") => {
-    if (type === "sale") router.push("/sales/new");
-    if (type === "purchase") router.push("/purchases/new");
-    if (type === "expense") router.push("/expenses/new");
-  };
+  // ============================================================
+  //   UI SECTION — NO DESIGN CHANGES
+  // ============================================================
 
   return (
     <header className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 p-3 sticky top-0 z-50">
@@ -159,7 +230,7 @@ export default function Header() {
 
         {/* RIGHT */}
         <div className="flex items-center gap-3">
-          {/* Quick Add */}
+          {/* QUICK ADD — enhanced */}
           <div className="relative">
             <button
               onClick={() => {
@@ -178,32 +249,30 @@ export default function Header() {
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-50"
+                  className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-50"
                 >
-                  <button
-                    onClick={() => handleQuickAdd("sale")}
-                    className="w-full px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900"
-                  >
-                    Add Sale
-                  </button>
-                  <button
-                    onClick={() => handleQuickAdd("purchase")}
-                    className="w-full px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900"
-                  >
-                    Add Purchase
-                  </button>
-                  <button
-                    onClick={() => handleQuickAdd("expense")}
-                    className="w-full px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900"
-                  >
-                    Add Expense
-                  </button>
+                  {[
+                    "sale",
+                    "purchase",
+                    "expense",
+                    "customer",
+                    "supplier",
+                    "product",
+                  ].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => handleQuickAdd(t)}
+                      className="w-full px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900 capitalize text-left"
+                    >
+                      Add {t}
+                    </button>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Notifications */}
+          {/* NOTIFICATIONS — improved UI */}
           <div className="relative">
             <button
               onClick={() => {
@@ -228,13 +297,42 @@ export default function Header() {
                   exit={{ opacity: 0, scale: 0.98 }}
                   className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
                 >
-                  {/* Notifications UI stays same */}
+                  <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <span className="text-sm font-semibold">Notifications</span>
+                    <button
+                      onClick={markAllRead}
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`p-3 border-b last:border-none ${
+                          n.read
+                            ? "bg-white dark:bg-slate-800"
+                            : "bg-slate-50 dark:bg-slate-900/30"
+                        }`}
+                      >
+                        <div className="text-sm font-medium">{n.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {n.body}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          {n.time}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Theme */}
+          {/* THEME */}
           <button
             onClick={() => setDark(!dark)}
             className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -246,12 +344,12 @@ export default function Header() {
             )}
           </button>
 
-          {/* Profile */}
+          {/* PROFILE */}
           <ProfileDropdown user={user ?? undefined} />
         </div>
       </div>
 
-      {/* Search Modal */}
+      {/* SEARCH MODAL — new results system */}
       <AnimatePresence>
         {searchOpen && (
           <motion.div
@@ -260,7 +358,41 @@ export default function Header() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
           >
-            {/* same modal, no change */}
+            <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-4">
+              <div className="flex items-center gap-2">
+                <HiSearch className="text-slate-400" />
+                <input
+                  ref={searchInputRef}
+                  className="w-full bg-transparent outline-none px-3 py-2 text-sm"
+                  placeholder="Search products, invoices, customers..."
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <button
+                  onClick={() => setSearchOpen(false)}
+                  className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <HiX />
+                </button>
+              </div>
+
+              {searchResults.length > 0 && (
+                <div className="mt-3 max-h-64 overflow-y-auto border-t border-slate-200 dark:border-slate-700">
+                  {searchResults.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded"
+                    >
+                      <div className="text-[10px] text-slate-400 uppercase">
+                        {item.type}
+                      </div>
+                      <div className="text-sm font-medium">{item.name}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

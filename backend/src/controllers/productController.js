@@ -189,24 +189,64 @@ export const deleteProduct = async (req, res) => {
 --------------------------------------------------------------------- */
 export const searchProducts = async (req, res) => {
   try {
-    const q = req.query.q || "";
+    const q = (req.query.q || req.query.search || "").trim();
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 30;
 
+    if (!q) {
+      return res.json({ items: [], total: 0, page: 1, pages: 1 });
+    }
+
+    // High-precision search patterns
+    const startsWith = new RegExp("^" + q, "i");
+    const contains = new RegExp(q, "i");
+
     const query = {
-      name: { $regex: q, $options: "i" },
+      $or: [
+        { name: startsWith },
+        { sku: startsWith },
+        { barcode: startsWith },
+
+        // fallback
+        { name: contains },
+        { sku: contains },
+        { barcode: contains },
+      ],
     };
 
     const total = await Product.countDocuments(query);
 
-    const products = await Product.find(query)
+    let products = await Product.find(query)
       .populate("categoryId", "name")
-      .sort({ name: 1 })
+      .sort({ name: 1 }) // optional sorting
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
+    // PRIORITY SORTING
+    const qLower = q.toLowerCase();
+    products = products.sort((a, b) => {
+      const aStr = `${a.name} ${a.sku} ${a.barcode}`.toLowerCase();
+      const bStr = `${b.name} ${b.sku} ${b.barcode}`.toLowerCase();
+
+      // 1. Exact match first
+      if (aStr === qLower && bStr !== qLower) return -1;
+      if (bStr === qLower && aStr !== qLower) return 1;
+
+      // 2. StartsWith query next
+      if (aStr.startsWith(qLower) && !bStr.startsWith(qLower)) return -1;
+      if (!aStr.startsWith(qLower) && bStr.startsWith(qLower)) return 1;
+
+      return 0;
+    });
+
+    // Format for dropdown
     const formatted = products.map((p) => ({
-      ...p.toObject(),
+      _id: p._id,
+      name: p.name,
+      sku: p.sku,
+      barcode: p.barcode,
+      costPrice: p.costPrice,
       categoryName: p.categoryId?.name || "Uncategorized",
     }));
 
@@ -217,6 +257,7 @@ export const searchProducts = async (req, res) => {
       pages: Math.ceil(total / limit),
     });
   } catch (err) {
+    console.error("Search error:", err);
     res.status(500).json({ message: "Search failed" });
   }
 };

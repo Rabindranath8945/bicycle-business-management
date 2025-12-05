@@ -1,15 +1,23 @@
+// src/routes/purchaseRoutes.js
 import express from "express";
 import {
   createPurchase,
-  getAllPurchases,
-  getPurchaseById,
-  deletePurchase,
+  listPurchases,
+  getPurchase,
 } from "../controllers/purchaseController.js";
+
+import { validate } from "../middleware/validateMiddleware.js";
+import { createPurchase as createPurchaseSchema } from "../validators/purchaseSchemas.js";
 
 const router = express.Router();
 
-router.route("/").post(createPurchase).get(getAllPurchases);
+// Create Purchase (with validation)
+router.post("/", validate(createPurchaseSchema), createPurchase);
 
-router.route("/:id").get(getPurchaseById).delete(deletePurchase);
+// List purchases
+router.get("/", listPurchases);
+
+// Get single purchase
+router.get("/:id", getPurchase);
 
 export default router;

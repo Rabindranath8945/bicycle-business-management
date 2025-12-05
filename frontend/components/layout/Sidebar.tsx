@@ -65,21 +65,61 @@ const menu = [
     name: "Purchases",
     icon: <Truck />,
     submenu: [
+      // 🟧 Dream POS UI Dashboard for Purchases
       {
-        name: "Add Purchase",
-        path: "/purchases/new",
-        icon: <CreditCard size={14} />,
-      },
-      {
-        name: "Purchase History",
+        name: "Purchases Dashboard",
         path: "/purchases",
         icon: <ClipboardList size={14} />,
       },
-      { name: "Suppliers", path: "/suppliers", icon: <UsersIcon size={14} /> },
+
+      // 🟦 PO
       {
-        name: "Purchase Orders",
-        path: "/purchases/orders",
+        name: "Create PO",
+        path: "/purchases/create-po",
         icon: <FileSpreadsheet size={14} />,
+      },
+      {
+        name: "PO List",
+        path: "/purchases/po/list",
+        icon: <ClipboardList size={14} />,
+      },
+
+      // 🟩 GRN
+      {
+        name: "Receive GRN",
+        path: "/purchases/receive-grn",
+        icon: <Truck size={14} />,
+      },
+      {
+        name: "GRN List",
+        path: "/purchases/grn/list",
+        icon: <Layers size={14} />,
+      },
+
+      // 🟨 Bills
+      {
+        name: "Create Bill",
+        path: "/purchases/create-bill",
+        icon: <CreditCard size={14} />,
+      },
+      {
+        name: "Bills List",
+        path: "/purchases/bills/list",
+        icon: <Receipt size={14} />,
+      },
+
+      // 🟥 Returns
+      {
+        name: "Purchase Returns",
+        path: "/purchases/returns",
+        icon: <FileDown size={14} />,
+      },
+
+      // Suppliers (already exists)
+      {
+        name: "Suppliers",
+        path: "/suppliers",
+        icon: <UsersIcon size={14} />,
       },
     ],
   },

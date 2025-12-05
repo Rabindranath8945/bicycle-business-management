@@ -1,40 +1,19 @@
+// src/models/Account.js
 import mongoose from "mongoose";
 
-const transactionSchema = new mongoose.Schema(
+const accountSchema = new mongoose.Schema(
   {
+    name: { type: String, required: true },
+    code: { type: String, required: true, unique: true },
     type: {
       type: String,
-      enum: ["Sale", "Purchase", "Expense", "Payment"],
+      enum: ["asset", "liability", "equity", "income", "expense"],
       required: true,
     },
-    referenceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      refPath: "typeRef",
-    },
-    typeRef: {
-      type: String,
-      enum: ["Sale", "Purchase", "Expense", "Payment"],
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    date: {
-      type: Date,
-      default: Date.now,
-    },
-    description: {
-      type: String,
-    },
-    paymentMethod: {
-      type: String,
-      enum: ["Cash", "Bank", "UPI", "Credit"],
-      default: "Cash",
-    },
+    balance: { type: Number, default: 0 }, // optional cached balance
   },
   { timestamps: true }
 );
 
-const Account = mongoose.model("Account", transactionSchema);
-
-export default Account;
+export default mongoose.models.Account ||
+  mongoose.model("Account", accountSchema);
