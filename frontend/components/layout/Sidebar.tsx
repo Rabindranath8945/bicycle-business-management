@@ -36,6 +36,7 @@ import {
   Shield,
   History,
   FilePlus,
+  CreditCardIcon,
 } from "lucide-react";
 
 /* ============================
@@ -85,36 +86,72 @@ const menu = [
         icon: <ClipboardList size={14} />,
       },
       {
-        name: "Receive Goods Return Notes",
-        path: "/purchases/receive-grn",
+        name: "Goods Return Notes (GRN)",
         icon: <Truck size={14} />,
+        sublinks: [
+          {
+            name: "Receive GRN",
+            path: "/purchases/receive-grn",
+            icon: <Truck size={14} />,
+          },
+          {
+            name: "GRN List",
+            path: "/purchases/grn/list",
+            icon: <Layers size={14} />,
+          },
+        ],
       },
       {
-        name: "Goods Return Notes List",
-        path: "/purchases/grn/list",
-        icon: <Layers size={14} />,
-      },
-      {
-        name: "Create Bill",
-        path: "/purchases/create-bill",
+        name: "Biils",
         icon: <CreditCard size={14} />,
+        sublinks: [
+          {
+            name: "Create Bill",
+            path: "/purchases/create-bill",
+            icon: <CreditCard size={14} />,
+          },
+          {
+            name: "Bills List",
+            path: "/purchases/bills/list",
+            icon: <Receipt size={14} />,
+          },
+        ],
       },
+
       {
-        name: "Bills List",
-        path: "/purchases/bills/list",
-        icon: <Receipt size={14} />,
-      },
-      {
-        name: "Purchase Returns",
-        path: "/purchases/returns",
+        name: "Returns",
         icon: <FileDown size={14} />,
+        sublinks: [
+          {
+            name: "Purchase Returns",
+            path: "/purchases/returns",
+            icon: <FileDown size={14} />,
+          },
+          {
+            name: "Create Purchase Return",
+            path: "/purchases/returns/create",
+            icon: <FilePlus size={14} />,
+          },
+        ],
       },
       {
-        name: "Create Purchase Return",
-        path: "/purchases/returns/create",
-        icon: <FilePlus size={14} />,
+        name: "Suppliers",
+        icon: <UsersIcon size={14} />,
+        sublinks: [
+          {
+            name: "Suppliers List",
+            path: "/suppliers",
+            icon: <UsersIcon size={14} />,
+          },
+
+          {
+            name: "Import / Export CSV",
+            path: "/suppliers/import",
+            icon: <FileDown size={14} />,
+          },
+        ],
       },
-      { name: "Suppliers", path: "/suppliers", icon: <UsersIcon size={14} /> },
+      ,
     ],
   },
 
