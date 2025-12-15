@@ -1,21 +1,20 @@
-// /app/api/bills/pdf/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { API_BASE } from "@/lib/api";
 import { generateBillPDFBuffer, PdfTheme } from "@/lib/pdf/billPdf";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+  context: { params: Promise<{ id: string }> }
+): Promise<Response> {
+  const { id } = await context.params;
 
   const url = new URL(req.url);
   const themeParam = url.searchParams.get("theme") as PdfTheme | null;
   const theme: PdfTheme =
     themeParam === "blue" || themeParam === "green" ? themeParam : "modern";
 
-  // fetch bill data from backend
-  let bill: any = null;
+  let bill: any;
+
   try {
     const res = await fetch(`${API_BASE}/api/purchases/${id}`, {
       cache: "no-store",
