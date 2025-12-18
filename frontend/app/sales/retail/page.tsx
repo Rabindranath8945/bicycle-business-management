@@ -12,8 +12,6 @@ import { usePOSKeyboard } from "@/lib/hooks/usePOSKeyboard";
 
 /* ================= TYPES ================= */
 
-type SaleMode = "RETAIL" | "WHOLESALE";
-
 type Category = {
   _id: string;
   name: string;
@@ -24,9 +22,9 @@ type Product = {
   _id: string;
   name: string;
   salePrice: number;
-  wholesalePrice?: number;
   taxPercent?: number;
   stock?: number;
+  category?: string;
 };
 
 type CartItem = {
@@ -40,31 +38,22 @@ type CartItem = {
 
 /* ================= PAGE ================= */
 
-export default function RetailSalePage() {
-  /* ---------- MODE ---------- */
-  const [saleMode, setSaleMode] = useState<SaleMode>("RETAIL");
-
+export default function RetailPOSPage() {
   /* ---------- UI ---------- */
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [offline, setOffline] = useState(false);
 
-  /* ---------- META ---------- */
-  const invoiceNo = "RT-" + Date.now().toString().slice(-5);
-  const now = new Date().toLocaleString();
-  const counter = "POS-1";
-  const user = "Admin";
-
-  /* ---------- CUSTOMER ---------- */
+  /* ---------- customer (mobile = identity) ---------- */
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerDue, setCustomerDue] = useState(0);
 
-  /* ---------- CATEGORY & PRODUCTS ---------- */
+  /* ---------- category & products ---------- */
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
 
-  /* ---------- CART ---------- */
+  /* ---------- cart ---------- */
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [fitting, setFitting] = useState(0);
@@ -95,7 +84,9 @@ export default function RetailSalePage() {
   useEffect(() => {
     axios
       .get("/api/products", {
-        params: { category: activeCategory || undefined },
+        params: {
+          category: activeCategory || undefined,
+        },
       })
       .then((res) => setProducts(res.data || []));
   }, [activeCategory]);
@@ -111,8 +102,10 @@ export default function RetailSalePage() {
     axios
       .get(`/api/customers/by-phone/${phone}`)
       .then((res) => {
-        setCustomerName(res.data?.name || "");
-        setCustomerDue(res.data?.balance || 0);
+        if (res.data) {
+          setCustomerName(res.data.name || "");
+          setCustomerDue(res.data.balance || 0);
+        }
       })
       .catch(() => {
         setCustomerName("");
@@ -144,11 +137,8 @@ export default function RetailSalePage() {
           _id: p._id,
           name: p.name,
           qty: 1,
-          price:
-            saleMode === "RETAIL"
-              ? p.salePrice
-              : p.wholesalePrice ?? p.salePrice,
-          tax: saleMode === "RETAIL" ? p.taxPercent ?? 5 : 18,
+          price: p.salePrice,
+          tax: p.taxPercent ?? 5,
           stock: p.stock,
         },
       ];
@@ -180,6 +170,7 @@ export default function RetailSalePage() {
   );
 
   const fittingGST = (fitting * 18) / 100;
+
   const rawTotal = subtotal + gst + fitting + fittingGST - discount;
   const roundedTotal = Math.round(rawTotal);
   const roundOff = roundedTotal - rawTotal;
@@ -187,36 +178,25 @@ export default function RetailSalePage() {
   /* ================= SAVE ================= */
 
   async function saveAndPay(payment: any) {
-    const payload = {
-      mode: saleMode,
-      phone,
-      customerName,
-      discount,
-      fitting,
-      roundOff,
-      payment,
-      items: cart.map((i) => ({
-        productId: i._id,
-        qty: i.qty,
-        price: i.price,
-        tax: i.tax,
-      })),
-    };
-
     try {
-      if (offline) {
-        const pending = JSON.parse(
-          localStorage.getItem("offlineSales") || "[]"
-        );
-        pending.push(payload);
-        localStorage.setItem("offlineSales", JSON.stringify(pending));
-        toast.success("Saved offline – will sync automatically");
-        setCart([]);
-        return;
-      }
+      const payload = {
+        phone,
+        customerName,
+        discount,
+        fitting,
+        roundOff,
+        payment,
+        items: cart.map((i) => ({
+          productId: i._id,
+          qty: i.qty,
+          price: i.price,
+          tax: i.tax,
+        })),
+      };
 
       const res = await axios.post("/api/sales", payload);
       window.open(`/api/sales/${res.data._id}/invoice?type=thermal`, "_blank");
+
       toast.success("Sale completed");
       setCart([]);
       setPaymentOpen(false);
@@ -224,18 +204,6 @@ export default function RetailSalePage() {
       toast.error("Failed to save sale");
     }
   }
-
-  /* ================= OFFLINE SYNC ================= */
-  useEffect(() => {
-    if (!offline) {
-      const pending = JSON.parse(localStorage.getItem("offlineSales") || "[]");
-      if (!pending.length) return;
-
-      pending.forEach((p: any) => axios.post("/api/sales", p));
-      localStorage.removeItem("offlineSales");
-      toast.success("Offline sales synced");
-    }
-  }, [offline]);
 
   /* ================= UI ================= */
 
@@ -249,73 +217,36 @@ export default function RetailSalePage() {
       />
 
       {/* HEADER */}
-      <div className="max-w-7xl mx-auto mb-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-3">
-              <Receipt className="text-emerald-600" />
-              <h1 className="text-xl font-bold">
-                {saleMode === "RETAIL" ? "Retail Sale" : "Wholesale Sale"}
-              </h1>
+      <div className="max-w-7xl mx-auto mb-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold flex items-center gap-2">
+          <Receipt className="text-emerald-600" />
+          Retail POS
+        </h1>
 
-              <TabButton
-                active={saleMode === "RETAIL"}
-                onClick={() => setSaleMode("RETAIL")}
-              >
-                Retail
-              </TabButton>
-
-              <TabButton
-                active={saleMode === "WHOLESALE"}
-                onClick={() => setSaleMode("WHOLESALE")}
-              >
-                Wholesale
-              </TabButton>
-
-              <TabButton
-                onClick={() => (window.location.href = "/products/new")}
-              >
-                + New Item
-              </TabButton>
-            </div>
-
-            <div className="text-xs text-gray-500 mt-1 flex gap-4">
-              <span>
-                Invoice: <b>{invoiceNo}</b>
-              </span>
-              <span>{now}</span>
-              <span>
-                Counter: <b>{counter}</b>
-              </span>
-              <span>
-                User: <b>{user}</b>
-              </span>
-              <span className="px-2 border rounded bg-gray-100">Thermal</span>
-              {offline && (
-                <span className="text-orange-600 flex items-center gap-1">
-                  <WifiOff size={12} /> Offline
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+        {offline && (
+          <span className="text-orange-600 flex items-center gap-1 text-sm">
+            <WifiOff size={14} /> Offline
+          </span>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto grid grid-cols-12 gap-4">
         {/* LEFT */}
         <div className="col-span-12 lg:col-span-8 bg-white rounded-xl border p-4">
           {/* CUSTOMER */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="text-sm text-gray-600 flex gap-1">
+              <label className="text-sm text-gray-600 flex items-center gap-1">
                 <Phone size={14} /> Mobile Number
               </label>
               <input
                 ref={searchRef}
                 className="input mt-1"
+                placeholder="Customer mobile number"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
+
               {customerDue > 0 && (
                 <div className="text-sm text-red-600 mt-1">
                   Previous Due: ₹{customerDue.toFixed(2)}
@@ -324,27 +255,26 @@ export default function RetailSalePage() {
             </div>
 
             <div>
-              <label className="text-sm text-gray-600 flex gap-1">
+              <label className="text-sm text-gray-600 flex items-center gap-1">
                 <User size={14} /> Customer Name
               </label>
               <input
                 className="input mt-1"
+                placeholder="Auto-filled"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
               />
             </div>
           </div>
 
-          <hr className="my-4" />
-
+          {/* CATEGORY STRIP */}
           <CategoryStrip
             categories={categories}
             activeId={activeCategory}
             onSelect={setActiveCategory}
           />
 
-          <div className="my-3" />
-
+          {/* PRODUCT GRID */}
           <ProductGrid
             products={products}
             cart={cart}
@@ -355,59 +285,42 @@ export default function RetailSalePage() {
         </div>
 
         {/* RIGHT */}
-        <div className="col-span-12 lg:col-span-4">
-          <div className="sticky top-4 space-y-3">
-            <div className="bg-white rounded-xl border h-[420px] flex flex-col">
-              <div className="flex-1 overflow-y-auto p-4">
-                <Row label="Subtotal" value={subtotal} />
-                <Row label="GST" value={gst} />
+        <div className="col-span-12 lg:col-span-4 bg-white rounded-xl border p-4">
+          <Row label="Subtotal" value={subtotal} />
+          <Row label="GST" value={gst} />
 
-                <InputRow
-                  label="Fitting Charges (18%)"
-                  value={fitting}
-                  onChange={setFitting}
-                />
+          <InputRow
+            label="Fitting Charges (18%)"
+            value={fitting}
+            onChange={setFitting}
+          />
 
-                <InputRow
-                  label="Discount"
-                  value={discount}
-                  onChange={setDiscount}
-                />
+          <InputRow label="Discount" value={discount} onChange={setDiscount} />
 
-                <Row label="Round Off" value={roundOff} />
+          <Row label="Round Off" value={roundOff} />
 
-                <div className="flex justify-between font-bold text-lg mt-3">
-                  <span>Total</span>
-                  <span className="text-emerald-600">
-                    ₹{roundedTotal.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* PAY BUTTON – FIXED AT BOTTOM */}
-              <div className="p-4 border-t">
-                <button
-                  onClick={() => cart.length && setPaymentOpen(true)}
-                  className="w-full bg-emerald-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
-                >
-                  <CreditCard size={18} />
-                  Pay ₹{roundedTotal.toFixed(2)}
-                </button>
-              </div>
-            </div>
-
-            {/* SHORTCUTS */}
-            <div className="bg-white rounded-xl border p-4 text-sm text-gray-600">
-              <b>Keyboard Shortcuts</b>
-              <ul className="mt-2 space-y-1">
-                <li>F2 – Focus Mobile / Search</li>
-                <li>F3 – Open Payment</li>
-                <li>ESC – Clear Category</li>
-                <li>+ / − – Qty Change</li>
-                <li>Enter – Add Product</li>
-              </ul>
-            </div>
+          <div className="flex justify-between font-bold text-lg my-3">
+            <span>Total</span>
+            <span className="text-emerald-600">₹{roundedTotal.toFixed(2)}</span>
           </div>
+
+          <button
+            onClick={() => {
+              if (!cart.length) return toast.error("Cart empty");
+              setPaymentOpen(true);
+            }}
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
+          >
+            <CreditCard size={18} />
+            Pay ₹{roundedTotal.toFixed(2)}
+          </button>
+
+          <button
+            onClick={() => saveAndPay({ method: "DUE", amount: roundedTotal })}
+            className="w-full mt-2 border border-red-500 text-red-600 py-2 rounded-lg"
+          >
+            Save as Due
+          </button>
         </div>
       </div>
     </div>
@@ -444,28 +357,5 @@ function InputRow({
         className="input mt-1 w-full"
       />
     </div>
-  );
-}
-
-function TabButton({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm border ${
-        active
-          ? "bg-emerald-600 text-white border-emerald-600"
-          : "bg-white hover:bg-gray-50 border-gray-300"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

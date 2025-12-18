@@ -1,5 +1,4 @@
 import "./globals.css";
-import { LayoutProvider } from "@/components/layout/LayoutContext";
 import ClientLayout from "@/components/layout/ClientLayout"; // 👈 new client wrapper
 import { Toaster } from "sonner";
 import AuthProvider from "@/lib/context/AuthContext";
@@ -17,14 +16,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-        <LayoutProvider>
-          <AuthProvider>
-            <ClientLayout>
-              <Toaster richColors position="top-right" />
-              {children}
-            </ClientLayout>
-          </AuthProvider>
-        </LayoutProvider>
+        <AuthProvider>
+          <ClientLayout>
+            <Toaster richColors position="top-right" />
+            {children}
+          </ClientLayout>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,315 +1,372 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import axios from "@/lib/axios";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Search,
-  Download,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
+  DollarSign,
+  TrendingUp,
+  TrendingDown, // Added missing import
+  ShoppingCart,
+  Receipt,
+  RotateCcw,
+  ArrowRight,
+  Plus,
+  Warehouse,
+  Users,
+  AlertTriangle,
+  CreditCard,
+  FilePlus,
+  UserPlus,
+  ClipboardList,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
-type SaleRow = {
-  _id: string;
-  invoiceNo: string;
-  customerName?: string;
-  phone?: string;
-  grandTotal: number;
-  createdAt: string;
+// Define the shape of our data
+type KPIs = {
+  totalInvoices: number;
+  pendingPayments: number;
+  retailSales: number;
+  returns: number;
+  monthSales: number;
+  receivables: number;
+  monthlySeries: number[];
 };
 
-export default function SalesHistoryPage() {
-  const [sales, setSales] = useState<SaleRow[]>([]);
-  const [loading, setLoading] = useState(false);
+const FALLBACK_KPI_DATA: KPIs = {
+  totalInvoices: 4500,
+  pendingPayments: 850,
+  retailSales: 3100,
+  returns: 120,
+  monthSales: 156890,
+  receivables: 45890,
+  monthlySeries: [
+    20000, 25000, 30000, 35000, 42000, 47000, 52000, 49000, 54000, 58000, 45000,
+    37000,
+  ],
+};
 
-  const [q, setQ] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+// Workflow data definition
+const WORKFLOW_ITEMS = [
+  {
+    title: "New Invoice",
+    desc: "Create billing",
+    icon: FilePlus,
+    href: "#",
+    color: "bg-blue-50 text-blue-600",
+  },
+  {
+    title: "Add Customer",
+    desc: "Grow database",
+    icon: UserPlus,
+    href: "#",
+    color: "bg-emerald-50 text-emerald-600",
+  },
+  {
+    title: "Inventory",
+    desc: "Stock levels",
+    icon: Warehouse,
+    href: "#",
+    color: "bg-purple-50 text-purple-600",
+  },
+  {
+    title: "Reports",
+    desc: "View analytics",
+    icon: ClipboardList,
+    href: "#",
+    color: "bg-amber-50 text-amber-600",
+  },
+];
 
-  const [page, setPage] = useState(1);
-  const [limit] = useState(20);
-  const [totalRows, setTotalRows] = useState<number | null>(null);
+export default function SalesDashboard() {
+  const [kpis] = useState<KPIs | null>(FALLBACK_KPI_DATA);
 
-  // simple debounce for q
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setPage(1);
-      fetchSales(1).catch(() => {});
-    }, 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  const spark = useMemo(
+    () => (kpis ? kpis.monthlySeries : new Array(12).fill(0)),
+    [kpis]
+  );
 
-  useEffect(() => {
-    fetchSales(page).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  async function fetchSales(p = 1) {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append("page", String(p));
-      params.append("limit", String(limit));
-      if (q) params.append("q", q);
-      if (from) params.append("from", from);
-      if (to) params.append("to", to);
-
-      const res = await axios.get(`/api/sales?${params.toString()}`);
-      // Expected: an array or { data: [], total }
-      const data = res.data;
-      if (Array.isArray(data)) {
-        setSales(data);
-        setTotalRows(
-          data.length < limit ? (p - 1) * limit + data.length : null
-        );
-      } else if (data?.sales) {
-        setSales(data.sales);
-        setTotalRows(typeof data.total === "number" ? data.total : null);
-      } else {
-        setSales(data || []);
-      }
-    } catch (err: any) {
-      console.error("fetchSales", err);
-      toast.error(err?.response?.data?.message || "Failed to fetch sales");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const filtered = useMemo(() => {
-    if (!q) return sales;
-    const s = q.toLowerCase();
-    return sales.filter(
-      (r) =>
-        (r.invoiceNo || "").toLowerCase().includes(s) ||
-        (r.customerName || "").toLowerCase().includes(s) ||
-        (r.phone || "").toLowerCase().includes(s)
-    );
-  }, [q, sales]);
-
-  const viewPdf = async (id: string) => {
-    try {
-      const res = await axios.get(`/api/sales/pdf/${id}`);
-      const data = res.data;
-      if (!data?.pdfBase64) throw new Error("No PDF returned");
-      const bytes = atob(data.pdfBase64);
-      const arr = new Uint8Array(bytes.length);
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-      const blob = new Blob([arr], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    } catch (err: any) {
-      console.error("viewPdf", err);
-      toast.error(err?.response?.data?.message || "Failed to open invoice");
-    }
-  };
-
-  const exportCsv = () => {
-    try {
-      if (!sales || sales.length === 0) {
-        toast.error("No rows to export");
-        return;
-      }
-      const rows = [["Invoice", "Customer", "Phone", "Total", "Date"]];
-      sales.forEach((s) =>
-        rows.push([
-          s.invoiceNo,
-          s.customerName ?? "",
-          s.phone ?? "",
-          String(Number(s.grandTotal).toFixed(2)),
-          new Date(s.createdAt).toLocaleString(),
-        ])
-      );
-      const csv = rows
-        .map((r) =>
-          r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
-        )
-        .join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `sales_export_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-    } catch (err) {
-      console.error("exportCsv", err);
-      toast.error("Export failed");
-    }
-  };
-
-  const handleApplyFilters = async () => {
-    setPage(1);
-    await fetchSales(1);
-  };
-
-  const handleResetFilters = async () => {
-    setQ("");
-    setFrom("");
-    setTo("");
-    setPage(1);
-    await fetchSales(1);
-  };
+  const KPICard = ({
+    title,
+    value,
+    sub,
+    icon: Icon,
+    colorClass,
+    delta,
+  }: {
+    title: string;
+    value: string | number;
+    sub: string;
+    icon: any;
+    colorClass: string;
+    delta?: number;
+  }) => (
+    <div className="group relative overflow-hidden bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+      <div className="flex justify-between items-start">
+        <div className={cn("p-3 rounded-xl text-white shadow-md", colorClass)}>
+          <Icon size={20} />
+        </div>
+        {delta !== undefined && (
+          <span
+            className={cn(
+              "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
+              delta > 0
+                ? "bg-emerald-50 text-emerald-600"
+                : "bg-rose-50 text-rose-600"
+            )}
+          >
+            {delta > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{" "}
+            {Math.abs(delta)}%
+          </span>
+        )}
+      </div>
+      <div className="mt-4">
+        <p className="text-sm font-medium text-gray-500">{title}</p>
+        <h3 className="text-2xl font-bold text-gray-900 mt-1">{value}</h3>
+        <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="p-6 text-slate-100 min-h-screen">
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto"
-      >
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold">Sales History</h1>
-            <p className="text-sm text-slate-400 mt-1">
-              View and manage past invoices
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <a
-              href="/sales/new"
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg"
-            >
-              <FileText size={16} />
-              New Sale
-            </a>
-
-            <button
-              onClick={exportCsv}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-700 rounded-lg text-slate-200 bg-slate-900/40"
-            >
-              <Download size={14} />
-              Export CSV
-            </button>
-          </div>
+    <div className="p-6 space-y-8 pb-10 bg-gray-50/50 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            Sales Dashboard
+          </h1>
+          <p className="text-gray-500">
+            Welcome back, here is what&apos;s happening today.
+          </p>
         </div>
+        <div className="flex gap-3">
+          {/* View Invoices Link */}
+          <a
+            href="/invoices"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-100 hover:border-gray-300 transition-all font-medium text-sm text-gray-700"
+          >
+            <Receipt size={18} /> View Invoices
+          </a>
 
-        {/* Filters */}
-        <div className="bg-slate-900/80 backdrop-blur p-4 rounded-2xl border border-slate-700 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
-              <Search size={16} className="text-slate-400" />
-              <input
-                placeholder="Search invoice, customer, phone..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className="bg-transparent outline-none text-sm w-full"
-              />
+          {/* Add New Sales Link */}
+          <a
+            href="/sales/new"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-blue-200/50 transition-all font-medium text-sm"
+          >
+            <Plus size={18} /> Add New Sales
+          </a>
+        </div>
+      </div>
+
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <KPICard
+          title="Invoices"
+          value={kpis?.totalInvoices ?? "—"}
+          sub="Lifetime volume"
+          icon={Receipt}
+          colorClass="bg-indigo-600"
+        />
+        <KPICard
+          title="Pending"
+          value={kpis?.pendingPayments ?? "—"}
+          sub="Invoices due"
+          icon={AlertTriangle}
+          colorClass="bg-amber-600"
+        />
+        <KPICard
+          title="Retail"
+          value={kpis?.retailSales ?? "—"}
+          sub="POS sales"
+          icon={ShoppingCart}
+          colorClass="bg-blue-600"
+        />
+        <KPICard
+          title="Returns"
+          value={kpis?.returns ?? "—"}
+          sub="Items back"
+          icon={RotateCcw}
+          colorClass="bg-rose-600"
+        />
+        <KPICard
+          title="Revenue"
+          value={kpis ? `₹${kpis.monthSales.toLocaleString()}` : "—"}
+          sub="This month"
+          icon={DollarSign}
+          colorClass="bg-emerald-600"
+          delta={12.5}
+        />
+        <KPICard
+          title="Receivables"
+          value={kpis ? `₹${kpis.receivables.toLocaleString()}` : "—"}
+          sub="Total debt"
+          icon={CreditCard}
+          colorClass="bg-purple-600"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          {/* Chart */}
+          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6">
+              Sales Performance: Last 12 Months
+            </h3>
+            <div className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={spark.map((val, i) => ({
+                    name: [
+                      "Jan",
+                      "Feb",
+                      "Mar",
+                      "Apr",
+                      "May",
+                      "Jun",
+                      "Jul",
+                      "Aug",
+                      "Sep",
+                      "Oct",
+                      "Nov",
+                      "Dec",
+                    ][i],
+                    sales: val,
+                  }))}
+                >
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor="#3b82f6"
+                        stopOpacity={0.15}
+                      />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f1f5f9"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorSales)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
+          </div>
 
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
-            />
-
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
-            />
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleApplyFilters}
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white"
+          {/* Workflow Bento Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {WORKFLOW_ITEMS.map((item) => (
+              <a
+                key={item.title}
+                href={item.href}
+                className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 transition-colors group"
               >
-                Apply
-              </button>
-              <button
-                onClick={handleResetFilters}
-                className="px-3 py-2 border border-slate-700 rounded-lg text-slate-200"
+                <div
+                  className={cn(
+                    "p-4 rounded-full group-hover:scale-110 transition-transform",
+                    item.color
+                  )}
+                >
+                  <item.icon size={24} />
+                </div>
+                <p className="mt-3 font-semibold text-gray-900 text-sm">
+                  {item.title}
+                </p>
+                <p className="text-xs text-gray-500 text-center mt-1">
+                  {item.desc}
+                </p>
+              </a>
+            ))}
+          </div>
+
+          {/* Top Customers */}
+          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+            <h3 className="font-bold mb-5 text-gray-900">
+              Top Customers (by Value)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { name: "Tech Corp", total: 60000 },
+                { name: "John Doe", total: 45000 },
+                { name: "Sarah Smith", total: 32000 },
+              ].map((customer, i) => (
+                <div
+                  key={i}
+                  className="flex items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
+                    {customer.name.substring(0, 2)}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {customer.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      ₹{customer.total.toLocaleString()}
+                    </p>
+                  </div>
+                  <ArrowRight size={16} className="ml-auto text-gray-400" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar Placeholder */}
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm h-fit">
+          <h3 className="font-bold text-gray-900 mb-4">Recent Activity</h3>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex gap-3 pb-4 border-b border-gray-50 last:border-0"
               >
-                Reset
-              </button>
-            </div>
+                <div className="h-2 w-2 mt-2 rounded-full bg-blue-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">
+                    Invoice #450{i} generated
+                  </p>
+                  <p className="text-xs text-gray-400">2 hours ago</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Table */}
-        <div className="bg-slate-900/80 border border-slate-700 rounded-2xl overflow-auto">
-          {loading ? (
-            <div className="p-6 text-center text-slate-400">Loading...</div>
-          ) : sales.length === 0 ? (
-            <div className="p-6 text-center text-slate-500">No sales found</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-slate-800">
-                <tr>
-                  <th className="p-3 text-left">Invoice</th>
-                  <th className="p-3 text-left">Customer</th>
-                  <th className="p-3 text-left">Phone</th>
-                  <th className="p-3 text-right">Total</th>
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {sales.map((s) => (
-                  <tr
-                    key={s._id}
-                    className="border-t border-slate-700 hover:bg-slate-800/30"
-                  >
-                    <td className="p-3">{s.invoiceNo}</td>
-                    <td className="p-3">{s.customerName || "-"}</td>
-                    <td className="p-3">{s.phone || "-"}</td>
-                    <td className="p-3 text-right">
-                      ₹{Number(s.grandTotal).toFixed(2)}
-                    </td>
-                    <td className="p-3">
-                      {new Date(s.createdAt).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => viewPdf(s._id)}
-                        className="inline-flex items-center gap-2 text-emerald-400 hover:underline"
-                      >
-                        <FileText size={14} />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Pagination */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="text-sm text-slate-400">
-            Showing {sales.length} {totalRows ? `of ${totalRows}` : ""} rows
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="p-2 bg-slate-800 border border-slate-700 rounded-lg"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            <div className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-900/50">
-              Page {page}
-            </div>
-
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              className="p-2 bg-slate-800 border border-slate-700 rounded-lg"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

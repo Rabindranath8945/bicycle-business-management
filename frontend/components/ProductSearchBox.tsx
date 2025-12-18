@@ -3,18 +3,22 @@
 import { useState, useEffect, useRef } from "react";
 import { fetcher } from "@/lib/api";
 
+type ProductSearchBoxProps = {
+  onSelect: (product: any) => void;
+  filter?: (product: any) => boolean;
+};
+
 export default function ProductSearchBox({
   onSelect,
-}: {
-  onSelect: (product: any) => void;
-}) {
+  filter,
+}: ProductSearchBoxProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Debounce fetch
+  // Debounced fetch
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -25,22 +29,29 @@ export default function ProductSearchBox({
       setLoading(true);
       try {
         const res = await fetcher(
-          `/api/products?search=${encodeURIComponent(query)}`
+          `/api/products?search=${encodeURIComponent(query.trim())}`
         );
-        setResults(Array.isArray(res) ? res : []);
+
+        const list = Array.isArray(res) ? res : [];
+        setResults(filter ? list.filter(filter) : list);
       } catch (err) {
         console.error(err);
+        setResults([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }, 200);
 
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, filter]);
 
   // Close dropdown on outside click
   useEffect(() => {
-    const onClick = (e: any) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    const onClick = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setShow(false);
       }
     };
@@ -79,7 +90,7 @@ export default function ProductSearchBox({
             >
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-gray-500">
-                {p.sku} • ₹{p.costPrice}
+                {p.sku || p.barcode} • ₹{p.sellingPrice ?? p.costPrice ?? 0}
               </div>
             </div>
           ))}

@@ -2,479 +2,450 @@
 
 import { useEffect, useState } from "react";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
+  CartesianGrid,
+  BarChart,
+  Bar,
   Cell,
-  Legend,
 } from "recharts";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  ShoppingBag,
+  ArrowUpRight,
+  AlertCircle,
+  MoreHorizontal,
+  Download,
+  Layers,
+  Package,
+  Calendar,
+  Activity,
+  ChevronRight,
+  Menu,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// DashboardPage.tsx
-// Default-exported React component for Next.js app.
-// TailwindCSS utility classes used for styling (no external color overrides here).
-// This file is intentionally self-contained and uses a single fetch to `/api/dashboard`.
-// Replace fetch endpoints with your real backend routes. Keep your theme variables in globals.
-
-type KPI = {
+// --- Types & Fallback Data (Extended) ---
+interface KPI {
   id: string;
   title: string;
   amount: string;
   sub?: string;
-  delta?: number; // percent change
+  delta?: number;
   color?: string;
-};
+  icon: any;
+}
+interface RecentSale {
+  id: string;
+  invoiceNo: string;
+  customer: string;
+  amount: number;
+  time: string;
+  status: "Paid" | "Pending";
+  method: string;
+}
+interface BestSellerItem {
+  id: string;
+  name: string;
+  sales: number;
+  qty: number;
+}
 
-type DashboardResponse = {
+interface DashboardResponse {
   kpis: KPI[];
-  alert?: { message: string; actionLabel?: string } | null;
   salesPurchaseSeries: { month: string; sales: number; purchase: number }[];
-  overall: { suppliers: number; customers: number; orders: number };
-  customerOverview: { name: string; value: number }[];
-  topSelling: { id: string; name: string; qty: number; image?: string }[];
-  lowStock: {
-    id: string;
-    name: string;
-    stock: number;
-    threshold: number;
-    image?: string;
-  }[];
-  recentSales: {
-    id: string;
-    invoiceNo: string;
-    customer: string;
-    amount: number;
-    time: string;
-  }[];
-};
+  recentSales: RecentSale[];
+  bestSellers: BestSellerItem[];
+}
 
 const FALLBACK_DATA: DashboardResponse = {
-  kpis: [
-    {
-      id: "sales",
-      title: "Total Sales",
-      amount: "$48,988,078",
-      sub: "+22% vs last month",
-      delta: 22,
-      color: "bg-amber-400",
-    },
-    {
-      id: "sales_return",
-      title: "Total Sales Return",
-      amount: "$16,478,145",
-      sub: "-2% vs last month",
-      delta: -2,
-      color: "bg-sky-500",
-    },
-    {
-      id: "purchase",
-      title: "Total Purchase",
-      amount: "$24,145,789",
-      sub: "+12% vs last month",
-      delta: 12,
-      color: "bg-emerald-400",
-    },
-    {
-      id: "purchase_return",
-      title: "Total Purchase Return",
-      amount: "$18,458,747",
-      sub: "-3% vs last month",
-      delta: -3,
-      color: "bg-indigo-500",
-    },
-  ],
-  alert: {
-    message:
-      "Your Product Apple Iphone 15 is running Low, already below 5 Pcs.",
-    actionLabel: "Add Stock",
-  },
+  kpis: [],
   salesPurchaseSeries: [
-    { month: "Jan", sales: 20000, purchase: 30000 },
-    { month: "Feb", sales: 25000, purchase: 28000 },
-    { month: "Mar", sales: 30000, purchase: 24000 },
-    { month: "Apr", sales: 35000, purchase: 30000 },
-    { month: "May", sales: 42000, purchase: 38000 },
-    { month: "Jun", sales: 47000, purchase: 44000 },
-    { month: "Jul", sales: 52000, purchase: 43000 },
-    { month: "Aug", sales: 49000, purchase: 41000 },
-    { month: "Sep", sales: 54000, purchase: 47000 },
-    { month: "Oct", sales: 58000, purchase: 52000 },
-    { month: "Nov", sales: 45000, purchase: 39000 },
-    { month: "Dec", sales: 37000, purchase: 34000 },
-  ],
-  overall: { suppliers: 6987, customers: 4896, orders: 487 },
-  customerOverview: [
-    { name: "First Time", value: 5500 },
-    { name: "Returning", value: 3500 },
-  ],
-  topSelling: [
-    { id: "p1", name: "Charger Cable - Lighting", qty: 247, image: "" },
-    { id: "p2", name: "Yves Saint Eau De Parfum", qty: 121, image: "" },
-  ],
-  lowStock: [
-    {
-      id: "l1",
-      name: "Vacuum Cleaner Robot",
-      stock: 2,
-      threshold: 5,
-      image: "",
-    },
-    { id: "l2", name: "Dell XPS 13", stock: 1, threshold: 3, image: "" },
+    { month: "Jan", sales: 4000, purchase: 2400 },
+    { month: "Feb", sales: 3000, purchase: 1398 },
+    { month: "Mar", sales: 9000, purchase: 2000 },
+    { month: "Apr", sales: 7500, purchase: 2780 },
+    { month: "May", sales: 8500, purchase: 1890 },
+    { month: "Jun", sales: 12000, purchase: 2390 },
   ],
   recentSales: [
     {
-      id: "s1",
-      invoiceNo: "INV-1001",
+      id: "1",
+      invoiceNo: "INV-001",
       customer: "John Doe",
-      amount: 540,
-      time: "Today",
+      amount: 120.0,
+      time: "2 mins",
+      status: "Paid",
+      method: "Paypal",
     },
     {
-      id: "s2",
-      invoiceNo: "INV-1002",
-      customer: "ACME Corp.",
-      amount: 1200,
-      time: "Yesterday",
+      id: "2",
+      invoiceNo: "INV-002",
+      customer: "Sarah Smith",
+      amount: 450.5,
+      time: "1 hour",
+      status: "Pending",
+      method: "Apple Pay",
     },
+    {
+      id: "3",
+      invoiceNo: "INV-003",
+      customer: "ACME Corp",
+      amount: 1200.0,
+      time: "3 hours",
+      status: "Paid",
+      method: "Stripe",
+    },
+    {
+      id: "4",
+      invoiceNo: "INV-004",
+      customer: "Bob Johnson",
+      amount: 1569.0,
+      time: "1 Day",
+      status: "Paid",
+      method: "PayU",
+    },
+    {
+      id: "5",
+      invoiceNo: "INV-005",
+      customer: "Tech Solutions",
+      amount: 1478.0,
+      time: "2 Days",
+      status: "Pending",
+      method: "Paytm",
+    },
+  ],
+  bestSellers: [
+    { id: "p1", name: "Lobar Handy", sales: 6547, qty: 5260 },
+    { id: "p2", name: "Bold V3.2", sales: 3474, qty: 5147 },
+    { id: "p3", name: "Lenovo 3rd Generation", sales: 1478, qty: 58784 },
+    { id: "p4", name: "Apple Series 5 Watch", sales: 987, qty: 63240 },
+    { id: "p5", name: "Woodcraft Sandal", sales: 784, qty: 5597 },
   ],
 };
 
-const COLORS = ["#FFBB28", "#00C49F", "#0088FE", "#FF8042"];
+// --- Components ---
+
+const BestSellerList = ({ items }: { items: BestSellerItem[] }) => (
+  <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-xl">
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-lg font-bold">Best Sellers</h3>
+      <button className="text-blue-400 text-sm hover:underline">
+        View All
+      </button>
+    </div>
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <Package size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">{item.name}</p>
+              <p className="text-xs text-slate-400">Total Sales: {item.qty}+</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-emerald-400">{item.sales}</p>
+            <p className="text-xs text-slate-500">units sold</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const RecentTransactionsTable = ({ items }: { items: RecentSale[] }) => (
+  <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-lg font-bold text-slate-900">Recent Transactions</h3>
+      <button className="text-blue-600 text-sm font-semibold hover:underline">
+        View All
+      </button>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-100">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Order Details
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Payment Method
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Status
+            </th>
+            <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Amount
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-slate-50">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+              <td className="px-4 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <div className="ml-0">
+                    <div className="text-sm font-medium text-slate-900">
+                      {item.customer}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {item.invoiceNo} • {item.time}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-500">
+                {item.method}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap">
+                <span
+                  className={cn(
+                    "px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full",
+                    item.status === "Paid"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  )}
+                >
+                  {item.status}
+                </span>
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-bold text-slate-900">
+                ${item.amount.toFixed(2)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+// --- Main Dashboard Component ---
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState("1Y");
-
-  useEffect(() => {
-    // Fetch dashboard data from your backend. Replace the URL with your real API.
-    fetch("/api/dashboard")
-      .then((res) => {
-        if (!res.ok) throw new Error("Network response was not ok");
-        return res.json();
-      })
-      .then((json: DashboardResponse) => {
-        setData(json);
-      })
-      .catch(() => {
-        // Fallback if API is not available yet
-        setData(FALLBACK_DATA);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const kpis = data?.kpis ?? FALLBACK_DATA.kpis;
-  const alert = data?.alert ?? FALLBACK_DATA.alert;
-  const series = data?.salesPurchaseSeries ?? FALLBACK_DATA.salesPurchaseSeries;
+  const [data, setData] = useState<DashboardResponse>(FALLBACK_DATA);
+  // Assume stock alerts data exists elsewhere
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50 max-w-[1600px] mx-auto">
-      <div className="max-w-full mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold">Welcome, Admin</h1>
-            <div className="text-sm text-gray-500">
-              You have <span className="font-medium">200+</span> Orders, Today
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-amber-500 text-white rounded shadow">
-              Add New
-            </button>
-            <button className="px-4 py-2 bg-slate-800 text-white rounded">
-              POS
-            </button>
-          </div>
+    <div className="space-y-8 pb-10">
+      {/* 1. TOP HEADER & GLOBAL ACTIONS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+            Executive Overview
+          </h1>
+          <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
+            <Calendar size={14} /> Real-time data for December 2025
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-all">
+            <Download size={16} /> Export Report
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
+            <Layers size={16} /> Manage View
+          </button>
+        </div>
+      </div>
 
-        {/* Alert Banner */}
-        {alert && (
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <svg
-                className="w-6 h-6 text-amber-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      {/* 2. PRIMARY KPI GRID - GLASS DESIGN (Unchanged) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          {
+            title: "Net Revenue",
+            val: "$124.5k",
+            trend: "+12.5%",
+            up: true,
+            icon: DollarSign,
+            color: "bg-blue-600",
+          },
+          {
+            title: "Active Orders",
+            val: "1,240",
+            trend: "+4.3%",
+            up: true,
+            icon: ShoppingBag,
+            color: "bg-indigo-600",
+          },
+          {
+            title: "Returns",
+            val: "$2.1k",
+            trend: "-2.1%",
+            up: false,
+            icon: TrendingDown,
+            color: "bg-rose-600",
+          },
+          {
+            title: "Purchase Due",
+            val: "$14.8k",
+            trend: "+0.5%",
+            up: true,
+            icon: AlertCircle,
+            color: "bg-amber-600",
+          },
+        ].map((kpi, idx) => (
+          <div
+            key={idx}
+            className="group relative overflow-hidden bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-white/50 shadow-sm hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex justify-between items-start">
+              <div
+                className={cn(
+                  "p-3 rounded-2xl text-white shadow-lg",
+                  kpi.color
+                )}
               >
-                <path
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8v4m0 4h.01M21 12A9 9 0 1 1 3 12a9 9 0 0 1 18 0z"
+                <kpi.icon size={20} />
+              </div>
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
+                  kpi.up
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-rose-50 text-rose-600"
+                )}
+              >
+                {kpi.up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{" "}
+                {kpi.trend}
+              </span>
+            </div>
+            <div className="mt-6">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
+                {kpi.title}
+              </p>
+              <h3 className="text-3xl font-black text-slate-900 mt-1">
+                {kpi.val}
+              </h3>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. CORE ANALYTICS BENTO SECTION (Unchanged layout structure) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* REVENUE GROWTH AREA CHART (8 COLS) */}
+        <div className="lg:col-span-8 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Revenue Velocity
+              </h3>
+              <p className="text-sm text-slate-400">
+                Projected vs Actual sales performance
+              </p>
+            </div>
+          </div>
+          <div className="h-[380px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.salesPurchaseSeries}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f1f5f9"
                 />
-              </svg>
-              <div className="text-sm text-amber-700">{alert.message}</div>
-            </div>
-            {alert.actionLabel && (
-              <button className="px-3 py-1 bg-amber-600 text-white rounded">
-                {alert.actionLabel}
-              </button>
-            )}
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 12 }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: "16px",
+                    border: "none",
+                    boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#2563eb"
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="rgba(37, 99, 235, 0.15)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="purchase"
+                  stroke="#94a3b8"
+                  strokeWidth={2}
+                  fill="transparent"
+                  strokeDasharray="5 5"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        )}
-
-        {/* KPI GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {kpis.map((k) => (
-            <div
-              key={k.id}
-              className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col justify-between"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm text-gray-500">{k.title}</div>
-                  <div className="text-2xl font-semibold mt-1">{k.amount}</div>
-                </div>
-                <div className="text-right">
-                  <div
-                    className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                      k.delta && k.delta > 0
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {k.delta && (k.delta > 0 ? `+${k.delta}%` : `${k.delta}%`)}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 text-sm text-gray-400">{k.sub}</div>
-            </div>
-          ))}
         </div>
 
-        {/* Main Grid: Charts + Right Widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Charts and lists (2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Sales & Purchase</h3>
-                <div className="flex items-center gap-2">
-                  {["1D", "1W", "1M", "3M", "6M", "1Y"].map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setRange(r)}
-                      className={`text-sm px-2 py-1 rounded ${
-                        range === r
-                          ? "bg-amber-500 text-white"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+        {/* RIGHT SIDE WIDGETS (STOCK ALERTS & TOP SELLING) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="flex-1 bg-slate-900 p-8 rounded-[2rem] text-white relative overflow-hidden">
+            <h3 className="text-lg font-bold">Stock Alerts</h3>
+            <div className="mt-6 space-y-4 relative z-10">
+              {["Bicycle Frame X2"].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-lg border border-white/10 rounded-2xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-500 rounded-lg text-white">
+                      <Package size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">Bicycle Frame X2</p>
+                      <p className="text-[10px] text-slate-400">
+                        Only 2 units left
+                      </p>
+                    </div>
+                  </div>
+                  <button className="text-[10px] font-bold bg-white text-slate-900 px-3 py-1 rounded-full uppercase">
+                    Order
+                  </button>
                 </div>
-              </div>
-              <div style={{ width: "100%", height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart
-                    data={series}
-                    margin={{ top: 10, right: 20, left: -10, bottom: 0 }}
-                  >
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="purchase" stackId="a" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="sales" stackId="a" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              ))}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Top Selling */}
-              <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Top Selling Products</h4>
-                  <div className="text-xs text-gray-400">Today</div>
-                </div>
-                <ul className="space-y-4">
-                  {(data?.topSelling ?? FALLBACK_DATA.topSelling).map(
-                    (item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-center justify-between p-3 rounded-2xl bg-white/50 backdrop-blur hover:bg-amber-50/30 transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer border border-white/40"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-xl flex items-center justify-center text-sm shadow-lg bg-gradient-to-br from-gray-200/80 to-white/40 backdrop-blur-md border border-white/30">
-                            Img
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">
-                              {item.name}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {item.qty} Sales
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-sm font-semibold">
-                          ${(Math.random() * 100).toFixed(0)}
-                        </div>
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
-
-              {/* Low Stock */}
-              <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Low Stock Products</h4>
-                  <div className="text-xs text-gray-400">View All</div>
-                </div>
-                <ul className="space-y-4">
-                  {(data?.lowStock ?? FALLBACK_DATA.lowStock).map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-center justify-between p-3 rounded-2xl bg-white/50 backdrop-blur hover:bg-amber-50/30 transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer border border-white/40"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-sm shadow-lg bg-gradient-to-br from-gray-200/80 to-white/40 backdrop-blur-md border border-white/30">
-                          Img
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">{item.name}</div>
-                          <div className="text-xs text-gray-400">
-                            {item.stock} in stock
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <button className="text-xs text-amber-600">
-                          Add Stock
-                        </button>
-                        <div className="text-xs text-red-500">
-                          Threshold {item.threshold}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Recent Sales */}
-              <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Recent Sales</h4>
-                  <div className="text-xs text-gray-400">Today</div>
-                </div>
-                <ul className="space-y-4">
-                  {(data?.recentSales ?? FALLBACK_DATA.recentSales).map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="text-sm font-medium">{s.customer}</div>
-                        <div className="text-xs text-gray-400">
-                          {s.invoiceNo} • {s.time}
-                        </div>
-                      </div>
-                      <div className="text-sm font-semibold">${s.amount}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <div className="absolute bottom-0 right-0 p-8 opacity-20">
+              <AlertCircle size={120} />
             </div>
           </div>
 
-          {/* Right Column */}
-          <aside className="space-y-4">
-            <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-              <h4 className="font-medium mb-3">Overall Information</h4>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <div className="text-2xl font-semibold">
-                    {data?.overall.suppliers ?? FALLBACK_DATA.overall.suppliers}
-                  </div>
-                  <div className="text-xs text-gray-400">Suppliers</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold">
-                    {data?.overall.customers ?? FALLBACK_DATA.overall.customers}
-                  </div>
-                  <div className="text-xs text-gray-400">Customers</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold">
-                    {data?.overall.orders ?? FALLBACK_DATA.overall.orders}
-                  </div>
-                  <div className="text-xs text-gray-400">Orders</div>
-                </div>
-              </div>
+          <div className="flex-1 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-900 flex justify-between items-center">
+              Sales by Country
+            </h3>
+            <div className="mt-4 flex items-center justify-center h-48">
+              {/* Placeholder for a map visualization */}
+              <div className="text-slate-400 text-sm">Interactive Map View</div>
             </div>
-
-            <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">Customers Overview</h4>
-                <div className="text-xs text-gray-400">Today</div>
-              </div>
-              <div style={{ width: "100%", height: 180 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie
-                      data={
-                        data?.customerOverview ?? FALLBACK_DATA.customerOverview
-                      }
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={60}
-                      innerRadius={30}
-                    >
-                      {(
-                        data?.customerOverview ?? FALLBACK_DATA.customerOverview
-                      ).map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-3 text-sm text-gray-500">
-                First Time vs Returning customers breakdown
-              </div>
-            </div>
-
-            <div className="relative bg-white/60 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/40 hover:shadow-2xl transition-all duration-300 overflow-hidden">
-              <h4 className="font-medium mb-3">Quick Actions</h4>
-              <div className="flex flex-col gap-2">
-                <button className="px-3 py-2 rounded bg-amber-500 text-white">
-                  Create Invoice
-                </button>
-                <button className="px-3 py-2 rounded border">
-                  Add Product
-                </button>
-                <button className="px-3 py-2 rounded border">
-                  Stock Adjustment
-                </button>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        {/* Footer / small note */}
-        <div className="mt-6 text-xs text-gray-400">
-          Dashboard powered by your POS — layout A applied exactly as requested.
-        </div>
-
-        {/* Loading overlay */}
-        {loading && (
-          <div className="fixed inset-0 bg-white/60 flex items-center justify-center">
-            <div className="text-gray-700">Loading dashboard...</div>
           </div>
-        )}
+        </div>
+      </div>
+
+      {/* 4. NEW ROW: BEST SELLERS & RECENT TRANSACTIONS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4">
+          <BestSellerList items={data.bestSellers} />
+        </div>
+        <div className="lg:col-span-8">
+          <RecentTransactionsTable items={data.recentSales} />
+        </div>
       </div>
     </div>
   );

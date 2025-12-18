@@ -1,401 +1,197 @@
+// components/layout/Header.tsx
 "use client";
-
-import { useEffect, useRef, useState } from "react";
+import React, { useState, useRef, useEffect, ReactNode } from "react";
+import Link from "next/link";
 import {
-  HiBell,
-  HiMenu,
-  HiMoon,
-  HiSun,
-  HiPlus,
-  HiSearch,
-  HiX,
-} from "react-icons/hi";
-import { useLayout } from "./LayoutContext";
-import ProfileDropdown from "./ProfileDropdown";
-import { fetcher } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+  Search,
+  Bell,
+  Settings,
+  User,
+  Plus,
+  ShoppingBag,
+  ChevronDown,
+  LogOut,
+  Package,
+  ArrowUpRight,
+  Twitter,
+  Facebook,
+  Linkedin, // Added social media icons
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function Header() {
-  const router = useRouter();
-  const { toggleMobile } = useLayout();
+// Define the TypeScript interface for Dropdown props
+interface DropdownProps {
+  children: ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+}
 
-  // -------------------------
-  //   HOOK STATE
-  // -------------------------
-  const [dark, setDark] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [now, setNow] = useState(new Date());
-
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-
-  // -------------------------
-  //   NOTIFICATIONS
-  // -------------------------
-  const [notifications, setNotifications] = useState([
-    {
-      id: "n1",
-      title: "Sale completed (INV-1004)",
-      body: "₹ 2,300 — Geeta",
-      time: "2m",
-      read: false,
-    },
-    {
-      id: "n2",
-      title: "Low stock alert",
-      body: "Only 2 left in Mountain X1",
-      time: "1h",
-      read: false,
-    },
-    {
-      id: "n3",
-      title: "Backup completed",
-      body: "Auto-backup done",
-      time: "Yesterday",
-      read: true,
-    },
-  ]);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const markAllRead = () =>
-    setNotifications((p) => p.map((n) => ({ ...n, read: true })));
-
-  // -------------------------
-  //   FETCH USER
-  // -------------------------
+// Reusable Dropdown Component
+const Dropdown: React.FC<DropdownProps> = ({ children, isOpen, onClose }) => {
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    fetcher("/api/auth/me")
-      .then((data) => setUser(data || null))
-      .catch(() => setUser(null));
-  }, []);
-
-  // -------------------------
-  //   CLOCK
-  // -------------------------
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // -------------------------
-  //   SAVE THEME (NEW)
-  // -------------------------
-  useEffect(() => {
-    const stored = localStorage.getItem("theme-dark");
-    if (stored === "true") setDark(true);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("theme-dark", dark.toString());
-    if (dark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [dark]);
-
-  // -------------------------
-  //   KEYBOARD SHORTCUTS
-  // -------------------------
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-
-      // search modal
-      if ((e.metaKey || e.ctrlKey) && key === "k") {
-        e.preventDefault();
-        setSearchOpen(true);
-        setTimeout(() => searchInputRef.current?.focus(), 50);
-      }
-
-      // notifications panel
-      if ((e.metaKey || e.ctrlKey) && key === "/") {
-        e.preventDefault();
-        setNotifOpen((prev) => !prev);
-      }
-
-      // quick add menu
-      if ((e.metaKey || e.ctrlKey) && key === "+") {
-        e.preventDefault();
-        setQuickAddOpen((prev) => !prev);
-      }
-
-      // close all
-      if (key === "escape") {
-        setNotifOpen(false);
-        setQuickAddOpen(false);
-        setSearchOpen(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        onClose();
       }
     };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onClose]);
 
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // -------------------------
-  //   GLOBAL SEARCH (NEW)
-  // -------------------------
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    // mock search — replace with API
-    const data = [
-      { type: "Product", name: "Hero Cycle", id: 1 },
-      { type: "Customer", name: "Ramesh", id: 2 },
-      { type: "Invoice", name: "INV-1040", id: 3 },
-      { type: "Supplier", name: "Rama Enterprise", id: 4 },
-    ];
-
-    const results = data.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    setSearchResults(results);
-  }, [searchQuery]);
-
-  // -------------------------
-  //   QUICK ADD HANDLER
-  // -------------------------
-  const handleQuickAdd = (type: string) => {
-    const routeMap: any = {
-      sale: "/sales/new",
-      purchase: "/purchases/new",
-      expense: "/expenses/new",
-      customer: "/customers/new",
-      supplier: "/suppliers/new",
-      product: "/products/new",
-    };
-
-    if (routeMap[type]) router.push(routeMap[type]);
-  };
-
-  // ============================================================
-  //   UI SECTION — NO DESIGN CHANGES
-  // ============================================================
+  if (!isOpen) return null;
 
   return (
-    <header className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 p-3 sticky top-0 z-50">
-      <div className="max-w-[1400px] mx-auto px-4 flex items-center justify-between gap-4">
-        {/* LEFT */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleMobile}
-            className="lg:hidden p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <HiMenu className="text-xl" />
-          </button>
+    <div
+      ref={ref}
+      className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
+    >
+      {children}
+    </div>
+  );
+};
 
-          <div className="flex flex-col">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {now.toLocaleDateString(undefined, {
-                weekday: "short",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              {now.toLocaleTimeString()}
-            </div>
-          </div>
-        </div>
+export default function Header() {
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-        {/* CENTER */}
-        <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-xl">
-            <div className="hidden sm:block">
-              <button
-                onClick={() => {
-                  setSearchOpen(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                }}
-                className="w-full text-left bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 flex items-center gap-3 hover:shadow-sm transition"
-              >
-                <HiSearch className="text-slate-400" />
-                <span className="text-sm text-slate-500 dark:text-slate-400">
-                  Search products, invoices…{" "}
-                  <span className="ml-2 text-xs">⌘K</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
+  // currentDateRange removed as requested
 
-        {/* RIGHT */}
-        <div className="flex items-center gap-3">
-          {/* QUICK ADD — enhanced */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setQuickAddOpen((s) => !s);
-                setNotifOpen(false);
-              }}
-              className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 border border-slate-100 dark:border-slate-800"
-            >
-              <HiPlus className="text-lg" />
-              <span className="hidden sm:inline text-sm">Add</span>
-            </button>
-
-            <AnimatePresence>
-              {quickAddOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-50"
-                >
-                  {[
-                    "sale",
-                    "purchase",
-                    "expense",
-                    "customer",
-                    "supplier",
-                    "product",
-                  ].map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => handleQuickAdd(t)}
-                      className="w-full px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900 capitalize text-left"
-                    >
-                      Add {t}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* NOTIFICATIONS — improved UI */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setNotifOpen((s) => !s);
-                setQuickAddOpen(false);
-              }}
-              className="relative p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <HiBell className="text-xl" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            <AnimatePresence>
-              {notifOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
-                >
-                  <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-semibold">Notifications</span>
-                    <button
-                      onClick={markAllRead}
-                      className="text-xs text-blue-500 hover:underline"
-                    >
-                      Mark all read
-                    </button>
-                  </div>
-
-                  <div className="max-h-64 overflow-y-auto">
-                    {notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        className={`p-3 border-b last:border-none ${
-                          n.read
-                            ? "bg-white dark:bg-slate-800"
-                            : "bg-slate-50 dark:bg-slate-900/30"
-                        }`}
-                      >
-                        <div className="text-sm font-medium">{n.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {n.body}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-1">
-                          {n.time}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* THEME */}
-          <button
-            onClick={() => setDark(!dark)}
-            className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            {dark ? (
-              <HiSun className="text-xl text-yellow-400" />
-            ) : (
-              <HiMoon className="text-xl" />
-            )}
-          </button>
-
-          {/* PROFILE */}
-          <ProfileDropdown user={user ?? undefined} />
+  return (
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-50 shadow-sm">
+      {/* Left side: Logo */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 text-gray-800 font-bold text-xl">
+          Mandal<span className="text-blue-600">Cycle Store</span>
         </div>
       </div>
 
-      {/* SEARCH MODAL — new results system */}
-      <AnimatePresence>
-        {searchOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
-          >
-            <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-4">
-              <div className="flex items-center gap-2">
-                <HiSearch className="text-slate-400" />
-                <input
-                  ref={searchInputRef}
-                  className="w-full bg-transparent outline-none px-3 py-2 text-sm"
-                  placeholder="Search products, invoices, customers..."
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <button
-                  onClick={() => setSearchOpen(false)}
-                  className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <HiX />
-                </button>
-              </div>
+      {/* Center: Large Search Bar */}
+      <div className="flex-1 flex justify-center mx-10">
+        <div className="relative w-full max-w-xl">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
+          />
+          <input
+            type="text"
+            placeholder="Search products, bills, customer names, SKUs..."
+            className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 transition duration-150"
+          />
+        </div>
+      </div>
 
-              {searchResults.length > 0 && (
-                <div className="mt-3 max-h-64 overflow-y-auto border-t border-slate-200 dark:border-slate-700">
-                  {searchResults.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded"
-                    >
-                      <div className="text-[10px] text-slate-400 uppercase">
-                        {item.type}
-                      </div>
-                      <div className="text-sm font-medium">{item.name}</div>
-                    </div>
-                  ))}
+      {/* Right side: Actions, Social Media, User Info, and Profile */}
+      <div className="flex items-center gap-4">
+        {/* Social Media Icons (New Feature) */}
+        <div className="flex items-center gap-3">
+          <a
+            href="https://twitter.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-blue-400 transition-colors"
+          >
+            <Twitter size={18} />
+          </a>
+          <a
+            href="https://facebook.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-blue-600 transition-colors"
+          >
+            <Facebook size={18} />
+          </a>
+          <a
+            href="https://linkedin.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-blue-700 transition-colors"
+          >
+            <Linkedin size={18} />
+          </a>
+        </div>
+
+        {/* The dedicated POS Quick Sale Button */}
+        <Link href="/sales/new">
+          <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition duration-150">
+            <Plus size={16} />
+            POS
+          </button>
+        </Link>
+
+        {/* Notifications Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setIsNotificationOpen(!isNotificationOpen);
+              setIsProfileOpen(false);
+            }}
+            className="p-2.5 rounded-full hover:bg-gray-100 transition-colors relative"
+          >
+            <Bell size={20} className="text-gray-600" />
+            <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full" />
+          </button>
+          <Dropdown
+            isOpen={isNotificationOpen}
+            onClose={() => setIsNotificationOpen(false)}
+          >
+            {/* ... notification items ... */}
+            <div className="p-4 text-sm text-gray-700">
+              <p className="font-semibold mb-2">Notifications</p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Package size={16} className="text-blue-500 mt-0.5" />
+                  <p>Low stock alert for **Lenovo 3rd Gen**.</p>
                 </div>
-              )}
+                <div className="flex items-start gap-3">
+                  <ArrowUpRight size={16} className="text-green-500 mt-0.5" />
+                  <p>New sale **#416645453773** completed.</p>
+                </div>
+              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Dropdown>
+        </div>
+
+        {/* User Profile/Settings Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setIsProfileOpen(!isProfileOpen);
+              setIsNotificationOpen(false);
+            }}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-semibold text-gray-800">John Smilga</p>
+              <p className="text-xs text-gray-500">Super Admin</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg">
+              <User size={18} />
+            </div>
+          </button>
+          <Dropdown
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+          >
+            <div className="p-4">
+              <Link
+                href="/settings"
+                className="flex items-center gap-3 p-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
+              >
+                <Settings size={16} />
+                Settings
+              </Link>
+              <button
+                onClick={() => alert("Logging out...")}
+                className="flex items-center gap-3 p-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md w-full"
+              >
+                <LogOut size={16} />
+                Log Out
+              </button>
+            </div>
+          </Dropdown>
+        </div>
+      </div>
     </header>
   );
 }
