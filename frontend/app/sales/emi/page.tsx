@@ -6,119 +6,99 @@ import {
   Search,
   Filter,
   Download,
-  RotateCcw,
-  MoreVertical,
-  Eye,
-  Printer,
-  TrendingDown,
-  TrendingUp,
   Calendar,
   ChevronDown,
+  FileText,
+  DollarSign,
+  Eye,
+  MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // --- Types ---
-type ReturnStatus = "Draft" | "Validated" | "Cancelled";
-type LogisticsStatus = "Pending" | "Received" | "Restocked";
+type SettlementStatus = "Pending" | "Settled" | "Partial";
 
-interface SalesReturn {
+interface EMISale {
   id: string;
-  number: string;
-  originalInvoice: string;
+  emiProvider: string;
+  invoiceRef: string;
   customer: string;
-  date: string;
-  amount: number;
-  status: ReturnStatus;
-  logistics: LogisticsStatus;
+  saleDate: string;
+  amountFinanced: number;
+  commissionRate: number; // Percentage
+  commissionAmount: number;
+  netSettlement: number;
+  status: SettlementStatus;
 }
 
-const RETURN_DATA: SalesReturn[] = [
+const EMI_DATA: EMISale[] = [
   {
     id: "1",
-    number: "RET/2025/004",
-    originalInvoice: "INV/2025/012",
+    emiProvider: "Bajaj Finance",
+    invoiceRef: "INV-9920",
     customer: "Ahmad Khan & Sons",
-    date: "2025-12-19",
-    amount: 450.0,
-    status: "Validated",
-    logistics: "Restocked",
+    saleDate: "2025-12-01",
+    amountFinanced: 2500.0,
+    commissionRate: 2.5,
+    commissionAmount: 62.5,
+    netSettlement: 2437.5,
+    status: "Settled",
   },
   {
     id: "2",
-    number: "RET/2025/003",
-    originalInvoice: "INV/2025/015",
-    customer: "Cycle Hub Ltd.",
-    date: "2025-12-18",
-    amount: 120.5,
-    status: "Validated",
-    logistics: "Received",
+    emiProvider: "HDFC Bank",
+    invoiceRef: "INV-9945",
+    customer: "Cycle Hub Wholesale",
+    saleDate: "2025-12-10",
+    amountFinanced: 1200.5,
+    commissionRate: 1.8,
+    commissionAmount: 21.61,
+    netSettlement: 1178.89,
+    status: "Pending",
   },
   {
     id: "3",
-    number: "RET/2025/002",
-    originalInvoice: "INV/2025/009",
+    emiProvider: "Bajaj Finance",
+    invoiceRef: "INV-9980",
     customer: "John Doe Retail",
-    date: "2025-12-17",
-    amount: 85.0,
-    status: "Draft",
-    logistics: "Pending",
-  },
-  {
-    id: "4",
-    number: "RET/2025/001",
-    originalInvoice: "INV/2025/001",
-    customer: "Modern Traders Inc.",
-    date: "2025-12-15",
-    amount: 1200.0,
-    status: "Cancelled",
-    logistics: "Pending",
+    saleDate: "2025-12-15",
+    amountFinanced: 450.0,
+    commissionRate: 2.5,
+    commissionAmount: 11.25,
+    netSettlement: 438.75,
+    status: "Partial",
   },
 ];
 
-export default function SalesReturnList() {
+export default function EMISalesList() {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const getStatusClasses = (status: ReturnStatus) => {
+  const getStatusClasses = (status: SettlementStatus) => {
     switch (status) {
-      case "Validated":
+      case "Settled":
         return "bg-green-100 text-green-800";
-      case "Cancelled":
-        return "bg-rose-100 text-rose-800";
-      case "Draft":
+      case "Partial":
+        return "bg-amber-100 text-amber-800";
+      case "Pending":
         return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getLogisticsColor = (logistics: LogisticsStatus) => {
-    switch (logistics) {
-      case "Restocked":
-        return "bg-green-500";
-      case "Received":
-        return "bg-blue-500";
-      case "Pending":
-        return "bg-amber-500";
-    }
-  };
-
   return (
-    // Background color matches theme image
     <div className="flex flex-col h-screen bg-gray-50/50">
       {/* --- TOP CONTROL PANEL --- */}
       <div className="bg-white shadow-sm border-b border-gray-200 px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-800 flex items-center gap-3">
-            <RotateCcw className="text-blue-600" size={24} /> Returns & Credit
-            Notes
-          </h1>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-800 flex items-center gap-3">
+          <DollarSign className="text-blue-600" size={24} /> EMI Sales
+          Management
+        </h1>
 
         <div className="flex items-center gap-4">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
             <Download size={16} /> Export
           </button>
-          {/* Primary Blue Button matches theme image */}
           <button className="flex items-center gap-1 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md font-semibold transition-colors">
-            <Plus size={18} /> New Return
+            <Plus size={18} /> Add EMI Sale
           </button>
         </div>
       </div>
@@ -133,7 +113,7 @@ export default function SalesReturnList() {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by RMA, Invoice or Customer..."
+                  placeholder="Search invoice ref, provider or customer..."
                   className="w-full pl-11 pr-4 py-2.5 border border-gray-300 bg-gray-50 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -142,10 +122,9 @@ export default function SalesReturnList() {
 
               <div className="flex gap-4">
                 <select className="px-4 py-2.5 border border-gray-300 bg-gray-50 rounded-lg text-sm text-gray-700 focus:ring-blue-500 focus:border-blue-500 appearance-none">
-                  <option>All Statuses</option>
-                  <option>Validated</option>
-                  <option>Draft</option>
-                  <option>Cancelled</option>
+                  <option>All Providers</option>
+                  <option>Bajaj Finance</option>
+                  <option>HDFC Bank</option>
                 </select>
                 <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">
                   <Filter size={16} /> Filter <ChevronDown size={14} />
@@ -157,106 +136,94 @@ export default function SalesReturnList() {
             </div>
           </div>
 
-          {/* TABLE AREA */}
+          {/* EMI Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    RMA Number
+                    Invoice Ref
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Customer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Orig. Invoice
+                    EMI Provider
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Date
+                    Sale Date
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Amount
+                    Financed Amount
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Commission (MDR)
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Net Settlement
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Inventory
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
+
               <tbody className="bg-white divide-y divide-gray-100">
-                {RETURN_DATA.map((item) => (
+                {EMI_DATA.map((sale) => (
                   <tr
-                    key={item.id}
-                    className="hover:bg-gray-50 transition-colors"
+                    key={sale.id}
+                    className="hover:bg-gray-50 transition duration-150"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold text-blue-600 cursor-pointer hover:underline">
-                      {item.number}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600 cursor-pointer hover:underline">
+                      {sale.invoiceRef}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                      {item.customer}
+                      {sale.customer}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                      {sale.emiProvider}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.originalInvoice}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.date}
+                      {sale.saleDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
-                      ${item.amount.toFixed(2)}
+                      ${sale.amountFinanced.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex justify-center">
-                        {/* Matches status badge style in image */}
-                        <span
-                          className={cn(
-                            "px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full",
-                            getStatusClasses(item.status)
-                          )}
-                        >
-                          {item.status}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">
+                          ${sale.commissionAmount.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          ({sale.commissionRate.toFixed(2)}%)
                         </span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
+                      ${sale.netSettlement.toFixed(2)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                          {/* Matches progress bar/dot style in image */}
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              getLogisticsColor(item.logistics),
-                              item.logistics === "Restocked"
-                                ? "w-full"
-                                : item.logistics === "Received"
-                                ? "w-2/3"
-                                : "w-1/4"
-                            )}
-                          />
-                        </div>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase">
-                          {item.logistics}
+                      <div className="flex justify-center">
+                        <span
+                          className={cn(
+                            "px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full",
+                            getStatusClasses(sale.status)
+                          )}
+                        >
+                          {sale.status}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2">
-                        {/* Action buttons matching image style */}
                         <button
-                          title="View"
+                          title="View Details"
                           className="p-1.5 text-blue-600 hover:text-blue-800 transition-colors"
                         >
                           <Eye size={16} />
-                        </button>
-                        <button
-                          title="Print"
-                          className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                          <Printer size={16} />
                         </button>
                         <button
                           title="More Actions"
