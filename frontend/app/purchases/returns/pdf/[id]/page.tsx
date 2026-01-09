@@ -1,164 +1,206 @@
 "use client";
 
-import { useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { fetcher } from "@/lib/api";
 import jsPDF from "jspdf";
 import autoTable, { RowInput } from "jspdf-autotable";
+import JsBarcode from "jsbarcode";
 
 const safeNum = (v: any) => Number(v ?? 0);
 
-async function fetchImageDataUrl(url: string): Promise<string | null> {
-  try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const blob = await r.blob();
-    return await new Promise((res) => {
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result));
-      fr.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.warn("Image fetch failed", err);
-    return null;
-  }
-}
-
-// barcode image via remote service
-function barcodeUrlFor(text: string) {
-  return `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(
-    text
-  )}&code=Code128&translate-esc=false`;
-}
-
 export default function ReturnPDFPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
+  const hasGenerated = useRef(false);
 
   useEffect(() => {
-    if (id) generatePDF();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (id && !hasGenerated.current) {
+      hasGenerated.current = true;
+      generatePDF();
+    }
   }, [id]);
+
+  const getBarcodeImg = (text: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      JsBarcode(canvas, text, {
+        format: "CODE128",
+        width: 1.5,
+        height: 40,
+        displayValue: false,
+        lineColor: "#1e1b4b",
+      });
+      resolve(canvas.toDataURL("image/png"));
+    });
+  };
 
   async function generatePDF() {
     try {
       const ret: any = await fetcher(`/api/purchase-returns/${id}`);
-      if (!ret) throw new Error("Return not found");
+      if (!ret) throw new Error("Return data missing");
 
+      const barcodeData = await getBarcodeImg(ret.returnNo || "RTN-PENDING");
       const doc = new jsPDF("p", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
 
-      // Header (logo text)
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(20);
-      doc.text("Mandal Cycle Store", 14, 18);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text("Haldia, Purba Medinipur · West Bengal", 14, 26);
-      doc.text("GSTIN: 19XXXXXXXXXX | +91 XXXXX XXXXX", 14, 31);
-
-      // right badge
-      doc.setFillColor(255, 193, 7);
-      doc.roundedRect(pageWidth - 72, 10, 64, 20, 3, 3, "F");
+      // --- 1. CORPORATE HEADER (Indigo Theme) ---
+      doc.setFillColor(30, 27, 75);
+      doc.rect(0, 0, pageWidth, 40, "F");
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(13);
-      doc.text("PURCHASE RETURN", pageWidth - 66, 24);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("MANDAL CYCLE STORE", 14, 18);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("Haldia, Purba Medinipur, West Bengal - 721607", 14, 25);
+      doc.text("GSTIN: 19XXXXXXXXXX | contact@mandalcycle.com", 14, 30);
+
+      // --- 2. DOCUMENT LABEL (Amber Theme) ---
+      doc.setFillColor(245, 158, 11);
+      doc.roundedRect(pageWidth - 70, 12, 60, 12, 2, 2, "F");
+      doc.setTextColor(30, 27, 75);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("PURCHASE RETURN", pageWidth - 65, 20);
+
+      // --- 3. BARCODE & REFERENCE ---
       doc.setTextColor(0, 0, 0);
-
-      // Barcode (fetch and embed)
-      const bcUrl = barcodeUrlFor(ret.returnNo || ret._id || "RTN");
-      const bcDataUrl = await fetchImageDataUrl(bcUrl);
-      if (bcDataUrl) doc.addImage(bcDataUrl, "PNG", pageWidth - 70, 34, 60, 18);
-
-      // return info
-      doc.setFontSize(11);
+      doc.addImage(barcodeData, "PNG", pageWidth - 65, 45, 55, 12);
+      doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text(`Return No: ${ret.returnNo}`, 14, 46);
+      doc.text(`Return No: ${ret.returnNo || "N/A"}`, 14, 52);
       doc.setFont("helvetica", "normal");
-      doc.text(`Date: ${new Date(ret.createdAt).toLocaleString()}`, 14, 52);
-      doc.text(`Linked Purchase: ${ret.purchase || "—"}`, 14, 58);
+      doc.text(`Date: ${new Date(ret.createdAt).toLocaleString()}`, 14, 58);
+      doc.text(`Linked Bill: ${ret.purchase || "Direct Return"}`, 14, 64);
 
-      // Supplier box
+      // --- 4. SUPPLIER BOX ---
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(14, 75, 90, 25, 2, 2, "F");
       doc.setFont("helvetica", "bold");
-      doc.text("Supplier", 14, 70);
-      doc.roundedRect(14, 73, pageWidth - 28, 25, 3, 3);
+      doc.text("RETURN TO (SUPPLIER)", 18, 82);
       doc.setFont("helvetica", "normal");
-      doc.text(ret.supplier?.name || "—", 18, 85);
+      doc.text(ret.supplier?.name || "General Supplier", 18, 88);
 
-      // items table
+      // --- 5. ITEMS TABLE ---
       const items = (ret.items || []) as any[];
-      const body: RowInput[] = items.map((it) => [
-        it.product?.name || "—",
+      const tableBody: RowInput[] = items.map((it) => [
+        {
+          content: it.product?.name || "—",
+          styles: { fontStyle: "bold" },
+        },
         String(safeNum(it.qty)),
-        `₹${safeNum(it.rate).toFixed(2)}`,
+        `₹${safeNum(it.rate).toLocaleString("en-IN")}`,
         `${safeNum(it.tax)}%`,
-        `₹${(safeNum(it.qty) * safeNum(it.rate)).toFixed(2)}`,
+        `₹${(
+          safeNum(it.qty) *
+          safeNum(it.rate) *
+          (1 + safeNum(it.tax) / 100)
+        ).toLocaleString("en-IN")}`,
       ]);
 
       autoTable(doc, {
-        startY: 100,
-        head: [["Product", "Qty", "Rate", "Tax%", "Total"]],
-        body,
-        headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-        styles: { fontSize: 10 },
+        startY: 110,
+        head: [["Description", "Qty", "Rate", "Tax", "Amount"]],
+        body: tableBody,
+        theme: "striped",
+        headStyles: { fillColor: [30, 27, 75], textColor: 255 },
+        styles: { fontSize: 9 },
       });
 
-      const lastTable: any = (doc as any).lastAutoTable;
-      const endY = lastTable && lastTable.finalY ? lastTable.finalY : 120;
+      const endY = (doc as any).lastAutoTable.finalY || 150;
 
-      // GST split (CGST + SGST)
+      // --- 6. FINANCIAL CALCULATIONS ---
       const totalAmount = safeNum(ret.totalAmount);
       const subtotal = items.reduce(
         (s, it) => s + safeNum(it.qty) * safeNum(it.rate),
         0
       );
-      const gst = +(totalAmount - subtotal).toFixed(2);
-      const cgst = +(gst / 2).toFixed(2);
-      const sgst = +(gst / 2).toFixed(2);
+      const taxTotal = totalAmount - subtotal;
 
-      // summary box
-      const sumY = endY + 12;
-      doc.setFont("helvetica", "bold");
-      doc.text("Return Summary", 14, sumY);
-      doc.roundedRect(14, sumY + 3, pageWidth - 28, 40, 3, 3);
+      // Summary Box
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(pageWidth - 95, endY + 10, 85, 45, 2, 2, "F");
 
+      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 18, sumY + 14);
-      doc.text(`CGST: ₹${cgst.toFixed(2)}`, 18, sumY + 20);
-      doc.text(`SGST: ₹${sgst.toFixed(2)}`, 18, sumY + 26);
-
-      doc.setFont("helvetica", "bold");
+      doc.text("Untaxed Subtotal:", pageWidth - 90, endY + 20);
       doc.text(
-        `Total Return: ₹${totalAmount.toFixed(2)}`,
-        pageWidth - 70,
-        sumY + 16
+        `₹${subtotal.toLocaleString("en-IN")}`,
+        pageWidth - 20,
+        endY + 20,
+        { align: "right" }
       );
 
-      // footer
-      doc.setFontSize(9);
-      doc.setTextColor(120);
+      doc.text("CGST (9%):", pageWidth - 90, endY + 27);
       doc.text(
-        "Mandal Cycle Store — Quality cycles & spare parts",
+        `₹${(taxTotal / 2).toLocaleString("en-IN")}`,
+        pageWidth - 20,
+        endY + 27,
+        { align: "right" }
+      );
+
+      doc.text("SGST (9%):", pageWidth - 90, endY + 34);
+      doc.text(
+        `₹${(taxTotal / 2).toLocaleString("en-IN")}`,
+        pageWidth - 20,
+        endY + 34,
+        { align: "right" }
+      );
+
+      doc.setDrawColor(229, 231, 235);
+      doc.line(pageWidth - 90, endY + 38, pageWidth - 20, endY + 38);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("NET RETURN VALUE:", pageWidth - 90, endY + 46);
+      doc.text(
+        `₹${totalAmount.toLocaleString("en-IN")}`,
+        pageWidth - 20,
+        endY + 46,
+        { align: "right" }
+      );
+
+      // --- 7. FOOTER ---
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        "Mandal Cycle Enterprise ERP v2026 — Official Return Document",
         pageWidth / 2,
-        288,
+        285,
         { align: "center" }
       );
-      doc.text("This is a system generated return note.", pageWidth / 2, 293, {
-        align: "center",
-      });
+      doc.text(
+        "This is a computer generated debit note. No physical signature required.",
+        pageWidth / 2,
+        290,
+        { align: "center" }
+      );
 
-      // open PDF in new tab
-      const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      // Render PDF in same tab
+      const blobURL = doc.output("bloburl");
+      window.location.replace(blobURL.toString());
     } catch (err) {
-      console.error("Failed to generate return PDF", err);
+      console.error(err);
       alert("Failed to generate PDF");
     }
   }
 
   return (
-    <div className="p-6 text-center text-gray-500">Generating Return PDF…</div>
+    <div className="flex flex-col items-center justify-center min-h-screen space-y-4 bg-gray-50">
+      <div className="fixed top-0 left-0 right-0 p-4">
+        <button
+          onClick={() => router.back()}
+          className="px-4 py-2 bg-white border border-gray-200 text-indigo-900 rounded-md shadow-sm text-xs font-bold hover:bg-gray-50 flex items-center gap-2"
+        >
+          ← EXIT TO LIST
+        </button>
+      </div>
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <p className="text-gray-500 font-bold uppercase tracking-widest text-xs animate-pulse">
+        Generating Debit Note 2026...
+      </p>
+    </div>
   );
 }

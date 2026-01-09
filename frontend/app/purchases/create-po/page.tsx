@@ -3,37 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import { fetcher } from "@/lib/api";
 import Link from "next/link";
-import ProductSearchBox from "@/components/ProductSearchBox";
+import {
+  Plus,
+  Trash2,
+  Scan,
+  FileText,
+  Truck,
+  Calendar,
+  Save,
+  Clipboard,
+  ChevronLeft,
+  Search,
+  PackageCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
- * Hybrid Fast Create PO
- * - Smart input at top receives scan / sku / name
- * - On add: product lookup -> inserted into items table
- * - Repeated adds of same product increment qty
- * - Bulk import via modal (Ctrl+I)
- *
- * Note: expects backend product search: GET /api/products?search=<q>
- * and POST /api/purchase-orders for saving.
+ * Redesigned Fast Create PO
+ * Matches the Enterprise/Odoo UI Theme
  */
-
-type ProductLite = {
-  _id?: string;
-  name?: string;
-  sku?: string;
-  barcode?: string;
-  costPrice?: number;
-  stock?: number;
-  // any other fields your API returns
-};
-
-type ItemRow = {
-  id: string;
-  productId?: string;
-  name: string;
-  sku?: string;
-  qty: number;
-  cost: number;
-};
 
 export default function FastCreatePO() {
   const smartRef = useRef<HTMLInputElement | null>(null);
@@ -41,547 +29,295 @@ export default function FastCreatePO() {
   const [supplier, setSupplier] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<ItemRow[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loadingAdd, setLoadingAdd] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
-  const [saving, setSaving] = useState(false);
-  const lastAddedRef = useRef<string | null>(null);
 
   useEffect(() => {
     focusSmart();
-    // keyboard for bulk import
-    const onKey = (e: KeyboardEvent) => {
-      // Ctrl+I to toggle bulk import
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i") {
-        e.preventDefault();
-        setBulkOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  function focusSmart() {
-    setTimeout(() => smartRef.current?.focus(), 50);
-  }
+  const focusSmart = () => setTimeout(() => smartRef.current?.focus(), 50);
 
-  function normalizeId() {
-    return String(Date.now()) + Math.floor(Math.random() * 9999);
-  }
-
-  // fast product lookup by barcode / sku / name
-  async function lookupProduct(q: string): Promise<ProductLite | null> {
-    if (!q || q.trim() === "") return null;
-    try {
-      const res = await fetcher(
-        `/api/products?search=${encodeURIComponent(q.trim())}`
-      );
-      // backend may return array of matches — pick exact by barcode/sku first, else first result
-      if (Array.isArray(res)) {
-        // find exact barcode or sku match
-        const lc = q.trim().toLowerCase();
-        const exact = res.find(
-          (p: any) =>
-            (p.barcode && p.barcode.toLowerCase() === lc) ||
-            (p.sku && p.sku.toLowerCase() === lc)
-        );
-        return exact || res[0] || null;
-      }
-      // if single object returned
-      return res || null;
-    } catch (err) {
-      console.error("product lookup failed", err);
-      return null;
-    }
-  }
-
-  // add item (called by Enter or scan)
-  async function handleAddSmart(raw: string) {
-    const q = raw.trim();
-    if (!q) return;
-    setLoadingAdd(true);
-    try {
-      const product = await lookupProduct(q);
-      // if found, add name, id, cost
-      if (product) {
-        addOrIncrement({
-          productId: product._id,
-          name: product.name || product.sku || q,
-          sku: product.sku || product.barcode || "",
-          cost: product.costPrice ?? 0,
-        });
-      } else {
-        // fallback: treat raw text as SKU/name without id
-        addOrIncrement({
-          productId: undefined,
-          name: q,
-          sku: q,
-          cost: 0,
-        });
-      }
-      lastAddedRef.current = q;
-      setSmartValue("");
-      focusSmart();
-    } finally {
-      setLoadingAdd(false);
-    }
-  }
-
-  // add or increment existing item with same productId or sku/name
-  function addOrIncrement(payload: {
-    productId?: string;
-    name: string;
-    sku?: string;
-    cost?: number;
-  }) {
-    setItems((prev) => {
-      // try match by productId first
-      const foundIndex = prev.findIndex(
-        (r) => payload.productId && r.productId === payload.productId
-      );
-      if (foundIndex >= 0) {
-        const copy = [...prev];
-        copy[foundIndex].qty += 1;
-        if (payload.cost !== undefined) copy[foundIndex].cost = payload.cost;
-        return copy;
-      }
-      // else match by sku or name (case-insensitive)
-      const key = (payload.sku || payload.name).toLowerCase();
-      const idx2 = prev.findIndex(
-        (r) => (r.sku || r.name).toLowerCase() === key
-      );
-      if (idx2 >= 0) {
-        const copy = [...prev];
-        copy[idx2].qty += 1;
-        if (payload.cost !== undefined) copy[idx2].cost = payload.cost;
-        return copy;
-      }
-      // otherwise insert new row at top for quick editing
-      const newRow: ItemRow = {
-        id: normalizeId(),
-        productId: payload.productId,
-        name: payload.name,
-        sku: payload.sku,
-        qty: 1,
-        cost: payload.cost ?? 0,
-      };
-      return [newRow, ...prev];
-    });
-  }
-
-  // inline edits
-  function updateRow(id: string, patch: Partial<ItemRow>) {
-    setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }
-
-  function removeRow(id: string) {
-    setItems((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  // bulk import: accepts lines like: sku,qty,cost  OR sku qty cost
-  function handleBulkPaste() {
-    const lines = bulkText
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const toAdd: { skuOrName: string; qty: number; cost: number }[] = [];
-    for (const ln of lines) {
-      const comma = ln.split(",");
-      if (comma.length >= 2) {
-        const sku = comma[0].trim();
-        const qty = Number(comma[1].trim()) || 1;
-        const cost = Number((comma[2] || "0").trim()) || 0;
-        toAdd.push({ skuOrName: sku, qty, cost });
-        continue;
-      }
-      const parts = ln.split(/\s+/);
-      if (parts.length >= 2) {
-        toAdd.push({
-          skuOrName: parts[0],
-          qty: Number(parts[1]) || 1,
-          cost: Number(parts[2] || 0) || 0,
-        });
-        continue;
-      }
-      // single word -> one qty
-      toAdd.push({ skuOrName: ln, qty: 1, cost: 0 });
-    }
-
-    // for speed, add synchronously: try lookup per sku/name in parallel to resolve productId and cost
-    (async () => {
-      for (const t of toAdd) {
-        const p = await lookupProduct(t.skuOrName).catch(() => null);
-        if (p) {
-          // add with Qty (not only increment)
-          setItems((prev) => {
-            const idx = p._id
-              ? prev.findIndex((r) => r.productId === p._id)
-              : prev.findIndex(
-                  (r) =>
-                    (r.sku || r.name).toLowerCase() ===
-                    t.skuOrName.toLowerCase()
-                );
-            if (idx >= 0) {
-              const cp = [...prev];
-              cp[idx].qty += t.qty;
-              cp[idx].cost = t.cost || cp[idx].cost || p.costPrice || 0;
-              return cp;
-            }
-            return [
-              {
-                id: normalizeId(),
-                productId: p._id,
-                name: p.name || t.skuOrName,
-                sku: p.sku,
-                qty: t.qty,
-                cost: t.cost || p.costPrice || 0,
-              },
-              ...prev,
-            ];
-          });
-        } else {
-          setItems((prev) => [
-            {
-              id: normalizeId(),
-              name: t.skuOrName,
-              sku: t.skuOrName,
-              qty: t.qty,
-              cost: t.cost,
-            },
-            ...prev,
-          ]);
-        }
-      }
-    })();
-
-    setBulkOpen(false);
-    setBulkText("");
-    focusSmart();
-  }
-
-  // totals
+  // Totals Calculation
   const subtotal = items.reduce((s, it) => s + it.qty * (it.cost || 0), 0);
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
 
-  // save PO
-  async function handleSave(alsoCreateGRN = false) {
-    if (!supplier) return alert("Please enter supplier ID or select supplier");
-    if (items.length === 0) return alert("Add items first");
-
-    const payload = {
-      supplier,
-      expectedDate: expectedDate || null,
-      notes,
-      items: items.map((it) => ({
-        product: it.productId || null,
-        productName: it.name,
-        qtyOrdered: it.qty,
-        cost: it.cost,
-      })),
-    };
-
-    setSaving(true);
-    try {
-      const res = await fetcher("/api/purchase-orders", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      alert("PO created");
-      if (alsoCreateGRN) {
-        // optional: open GRN creation with PO id param (front-end only)
-        window.location.href = `/purchases/receive-grn?po=${res._id}`;
-      } else {
-        window.location.href = "/purchases/po/list";
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to save purchase order");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // smart input handlers: Enter adds; paste (barcode scanners often send paste events)
-  function onSmartKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const v = smartValue.trim();
-      if (v) handleAddSmart(v);
-    }
-  }
-
-  async function onSmartPaste(e: React.ClipboardEvent<HTMLInputElement>) {
-    // scanners often paste barcode; handle immediate add
-    const pasted = e.clipboardData.getData("text");
-    if (!pasted) return;
-    // small heuristic: if pasted contains newline => bulk paste -> open bulk import
-    if (pasted.includes("\n")) {
-      setBulkText(pasted);
-      setBulkOpen(true);
-      e.preventDefault();
-      return;
-    }
-    // otherwise treat as single barcode
-    e.preventDefault();
-    setSmartValue(pasted);
-    await handleAddSmart(pasted);
-  }
-
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left / center: fast input + table */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Quick Purchase Entry</h2>
-            <div className="text-sm text-gray-500">
-              Mode: Hybrid Fast Entry — Ctrl/⌘ + I to bulk import
+    <div className="min-h-screen bg-[#F9FAFB] pb-20">
+      {/* 1. TOP BAR (Action Header) */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/purchases"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <ChevronLeft size={20} className="text-gray-500" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 leading-tight">
+                Create Purchase Order
+              </h1>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                New Draft PO
+              </p>
             </div>
           </div>
 
-          {/* Top: Supplier + Smart input */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <input
-                placeholder="Supplier ID or name"
-                className="p-3 border rounded-lg"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-              />
-              <input
-                type="date"
-                className="p-3 border rounded-lg"
-                value={expectedDate}
-                onChange={(e) => setExpectedDate(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setBulkOpen(true);
-                  }}
-                  className="px-3 py-2 bg-amber-500 text-white rounded-lg"
-                >
-                  Bulk Import (Ctrl+I)
-                </button>
-                <button
-                  onClick={() => {
-                    setItems([]);
-                    setSupplier("");
-                    setNotes("");
-                  }}
-                  className="px-3 py-2 border rounded-lg"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="hidden lg:flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
+            >
+              <Clipboard size={16} /> Bulk Import (Ctrl+I)
+            </button>
+            <button className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
+              <Save size={16} /> Confirm Order
+            </button>
+          </div>
+        </div>
+      </div>
 
-            <div className="mt-4">
-              <div className="text-xs text-gray-500 mb-1">
-                Scan barcode or type product name / SKU and press Enter
+      <main className="max-w-[1600px] mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* LEFT COLUMN: Main Inputs & Table */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* A. SCANNABLE HUB */}
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm ring-2 ring-indigo-500/5">
+            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Scan size={14} /> Quick Entry / Scanner
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
-              <div className="flex gap-3">
-                <ProductSearchBox
-                  onSelect={(product) =>
-                    handleAddSmart(
-                      product.sku || product.barcode || product.name
-                    )
-                  }
-                />
-
-                <button
-                  onClick={() => handleAddSmart(smartValue)}
-                  disabled={loadingAdd}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg"
-                >
-                  {loadingAdd ? "Adding…" : "Add"}
-                </button>
+              <input
+                ref={smartRef}
+                value={smartValue}
+                onChange={(e) => setSmartValue(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && alert("Add Logic Called")
+                }
+                placeholder="Scan barcode or type SKU / Product Name..."
+                className="block w-full pl-11 pr-4 py-4 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-lg"
+              />
+              <div className="absolute inset-y-0 right-4 flex items-center">
+                {loadingAdd ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                ) : (
+                  <kbd className="hidden sm:inline-block px-2 py-1 text-xs font-semibold text-gray-400 bg-white border border-gray-200 rounded shadow-sm">
+                    Enter
+                  </kbd>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Items table */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="font-medium">Items ({items.length})</div>
-              <div className="text-xs text-gray-500">
-                Click Qty/Cost to edit inline. Use keyboard for speed.
-              </div>
+          {/* B. ITEMS TABLE */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <PackageCheck size={18} className="text-gray-500" /> Order Lines
+              </h3>
+              <span className="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded border border-gray-200">
+                {items.length} unique items
+              </span>
             </div>
 
-            <div className="overflow-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2">Product</th>
-                    <th>SKU</th>
-                    <th className="text-right">Qty</th>
-                    <th className="text-right">Cost</th>
-                    <th className="text-right">Line</th>
-                    <th></th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50/80 text-[11px] uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Product Details</th>
+                    <th className="px-4 py-4 text-center">Qty</th>
+                    <th className="px-4 py-4 text-right">Unit Cost (₹)</th>
+                    <th className="px-4 py-4 text-right">Subtotal (₹)</th>
+                    <th className="px-6 py-4 text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {items.map((it) => (
-                    <tr key={it.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2">{it.name}</td>
-                      <td className="text-xs text-gray-500">{it.sku}</td>
-                      <td className="text-right">
-                        <input
-                          type="number"
-                          value={it.qty}
-                          onChange={(e) =>
-                            updateRow(it.id, {
-                              qty: Math.max(0, Number(e.target.value) || 0),
-                            })
-                          }
-                          className="w-20 p-1 border rounded text-right"
-                        />
-                      </td>
-                      <td className="text-right">
-                        <input
-                          type="number"
-                          value={it.cost}
-                          onChange={(e) =>
-                            updateRow(it.id, {
-                              cost: Math.max(0, Number(e.target.value) || 0),
-                            })
-                          }
-                          className="w-28 p-1 border rounded text-right"
-                        />
-                      </td>
-                      <td className="text-right font-medium">
-                        ₹{(it.qty * it.cost).toLocaleString()}
-                      </td>
-                      <td className="text-right">
-                        <button
-                          onClick={() => removeRow(it.id)}
-                          className="text-red-500 px-2"
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {items.length === 0 && (
+                <tbody className="divide-y divide-gray-50">
+                  {items.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={6}
-                        className="py-10 text-center text-gray-500"
-                      >
-                        No items yet — scan or type to add
+                      <td colSpan={5} className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center opacity-40">
+                          <Scan size={48} className="mb-4" />
+                          <p className="text-sm font-medium">
+                            Ready for scanning...
+                          </p>
+                        </div>
                       </td>
                     </tr>
+                  ) : (
+                    items.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-indigo-50/30 transition-colors group"
+                      >
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-gray-900">{row.name}</p>
+                          <p className="text-xs text-gray-400 font-mono tracking-tighter">
+                            {row.sku || "NO-SKU"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <input
+                            type="number"
+                            value={row.qty}
+                            className="w-20 mx-auto block text-center py-1.5 border-gray-200 rounded bg-white shadow-sm focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <input
+                            type="number"
+                            value={row.cost}
+                            className="w-28 ml-auto block text-right py-1.5 border-gray-200 rounded bg-white shadow-sm focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-right font-bold text-gray-800">
+                          ₹{(row.qty * row.cost).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
           </div>
-
-          {/* Notes */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <label className="text-sm text-gray-600">
-              Notes / Instructions
-            </label>
-            <textarea
-              rows={3}
-              className="w-full mt-2 p-2 border rounded"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
         </div>
 
-        {/* Right column: summary + actions */}
-        <aside className="space-y-4">
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-sm text-gray-500">Summary</div>
-            <div className="mt-3 text-2xl font-semibold">
-              ₹{subtotal.toLocaleString()}
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              GST (18%): ₹{gst.toLocaleString()}
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              Total:{" "}
-              <span className="font-medium">₹{total.toLocaleString()}</span>
-            </div>
+        {/* RIGHT COLUMN: Metadata & Summary */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* C. SUPPLIER & DATE INFO */}
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-gray-900 border-b border-gray-50 pb-2 flex items-center gap-2">
+              <Truck size={16} className="text-gray-400" /> Logistics Details
+            </h3>
 
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={() => handleSave(false)}
-                disabled={saving}
-                className="w-full px-4 py-3 bg-amber-600 text-white rounded-lg"
-              >
-                {saving ? "Saving…" : "Save PO"}
-              </button>
-              <button
-                onClick={() => handleSave(true)}
-                disabled={saving}
-                className="w-full px-4 py-3 border rounded-lg text-amber-600"
-              >
-                Save & Create GRN
-              </button>
-            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase">
+                  Supplier
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    placeholder="Search or Enter Supplier ID"
+                    className="w-full pl-3 pr-3 py-2 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
+              </div>
 
-            <div className="mt-3 text-xs text-gray-500">
-              Tip: use a barcode scanner or mobile camera to add items quickly.
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase">
+                  Expected Arrival
+                </label>
+                <div className="relative mt-1">
+                  <Calendar
+                    size={14}
+                    className="absolute left-3 top-3 text-gray-400"
+                  />
+                  <input
+                    type="date"
+                    value={expectedDate}
+                    onChange={(e) => setExpectedDate(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase">
+                  Internal Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Terms, conditions, or shipping instructions..."
+                  className="w-full mt-1 p-3 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-3 rounded-xl shadow-sm border">
-            <div className="text-sm font-medium mb-2">Quick shortcuts</div>
-            <ul className="text-sm text-gray-600 space-y-2">
-              <li>Enter → Add product</li>
-              <li>Ctrl / ⌘ + I → Bulk import</li>
-              <li>Click cost/qty → edit</li>
-            </ul>
-          </div>
-        </aside>
-      </div>
+          {/* D. ORDER SUMMARY (Odoo style) */}
+          <div className="bg-indigo-900 text-white p-6 rounded-xl shadow-lg shadow-indigo-100">
+            <h3 className="text-xs font-bold uppercase tracking-[2px] opacity-60 mb-6">
+              Order Summary
+            </h3>
+            <div className="space-y-4 font-medium">
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">Subtotal</span>
+                <span>₹{subtotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">GST (18%)</span>
+                <span>₹{gst.toLocaleString()}</span>
+              </div>
+              <div className="h-[1px] bg-white/10 my-2" />
+              <div className="flex justify-between items-baseline">
+                <span className="text-sm font-bold">Total Amount</span>
+                <span className="text-2xl font-black text-indigo-300">
+                  ₹{total.toLocaleString()}
+                </span>
+              </div>
+            </div>
 
-      {/* Bulk import modal (simple) */}
+            <div className="mt-8 pt-6 border-t border-white/10 space-y-3">
+              <div className="flex items-center gap-3 text-xs text-indigo-200">
+                <FileText size={14} />
+                <span>PO status will be marked as "Draft"</span>
+              </div>
+              <button className="w-full py-3 bg-white text-indigo-900 font-bold rounded-lg shadow-md hover:bg-indigo-50 transition-colors">
+                Complete Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* BULK IMPORT MODAL (Ctrl+I) */}
       {bulkOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-3xl rounded-lg p-4 shadow">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">Bulk Import Items</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-8 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Clipboard className="text-indigo-600" /> Bulk Item Import
+              </h2>
               <button
                 onClick={() => setBulkOpen(false)}
-                className="text-gray-500"
+                className="text-gray-400 hover:text-gray-600"
               >
-                Close
+                &times;
               </button>
             </div>
-
-            <div className="text-sm text-gray-600 mb-2">
-              Paste lines in format: <code>sku,qty,cost</code> OR{" "}
-              <code>sku qty cost</code>. Example: <code>SKU123,5,120</code>
-            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Paste items in format:{" "}
+              <code className="bg-gray-100 px-1 rounded">sku, qty, cost</code>{" "}
+              (one per line)
+            </p>
             <textarea
-              rows={8}
-              className="w-full p-2 border rounded"
+              className="w-full h-64 p-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-0 font-mono text-sm"
+              placeholder="Example:&#10;NIKE-AIR,10,2500&#10;ADIDAS-RUN,5,1800"
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
-            <div className="mt-3 flex gap-2">
+            <div className="mt-6 flex gap-3">
               <button
-                onClick={handleBulkPaste}
-                className="px-3 py-2 bg-amber-600 text-white rounded"
+                onClick={() => setBulkOpen(false)}
+                className="flex-1 py-3 text-sm font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
               >
-                Import
+                Cancel
               </button>
-              <button
-                onClick={() => {
-                  setBulkText("");
-                  focusSmart();
-                }}
-                className="px-3 py-2 border rounded"
-              >
-                Clear & Focus
+              <button className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">
+                Import Items
               </button>
             </div>
           </div>

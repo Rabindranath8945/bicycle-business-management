@@ -40,12 +40,12 @@ export default function PrintBarcodePage() {
     Array.from({ length: count }, (_, i) => i);
 
   const handlePrint = () => {
-    // Add print specific CSS here to only print the desired section
+    // A robust way to manage print styles: using CSS print media queries
+    // The current implementation swaps body content which works but needs reload afterward.
     const printContents = printAreaRef.current?.innerHTML;
     const originalContents = document.body.innerHTML;
 
     if (printContents) {
-      // A simple way to manage print styles: swap body content
       document.body.innerHTML = printContents;
       window.print();
       document.body.innerHTML = originalContents;
@@ -191,8 +191,7 @@ export default function PrintBarcodePage() {
                     <div className="barcode-name">
                       {productName.substring(0, 25)}
                     </div>
-                    {/* The SVG will be injected here by JsBarcode library script when run */}
-                    {/* Using a placeholder SVG for visual representation in React */}
+                    {/* Placeholder SVG for visual representation in React */}
                     <svg
                       className="barcode-item mx-auto"
                       data-value={sku}
@@ -201,11 +200,12 @@ export default function PrintBarcodePage() {
                         maxWidth: "150px",
                         height: "50px",
                       }}
-                      // MOCK SVG path for demonstration
+                      viewBox="0 0 150 50"
+                      // Completed MOCK SVG path for demonstration
                       dangerouslySetInnerHTML={{
-                        __html: `<rect fill="black" x="0" y="0" width="1.5" height="50""")/>><rect fill="black" x="4" y="0" width="1.5" height="50""")/>><rect fill="black" x="7" y="0" width="4.5" height="50""")/>><rect fill="black" x="14" y="0" width="1.5" height="50""")/>><rect fill="black" x="18" y="0" width="1.5" height="50""")/>><rect fill="black" x="22" y="0" width="1.5" height="50""")/>><rect fill="black" x="25" y="0" width="1.5" height="50""")/>><rect fill="black" x="29" y="0" width="4.5" height="50""")/>><rect fill="black" x="35" y="0" width="1.5" height="50""")/>>`,
+                        __html: `<rect fill="black" x="0" y="0" width="2" height="50""")/>><rect fill="black" x="4" y="0" width="2" height="50""")/>><rect fill="black" x="8" y="0" width="1" height="50""")/>><rect fill="black" x="11" y="0" width="3" height="50""")/>><rect fill="black" x="16" y="0" width="1" height="50""")/>><rect fill="black" x="19" y="0" width="2" height="50""")/>><rect fill="black" x="23" y="0" width="1" height="50""")/>><rect fill="black" x="26" y="0" width="3" height="50""")/>><rect fill="black" x="31" y="0" width="2" height="50""")/>><rect fill="black" x="35" y="0" width="1" height="50""")/>><rect fill="black" x="38" y="0" width="1" height="50""")/>><rect fill="black" x="41" y="0" width="2" height="50""")/>><rect fill="black" x="45" y="0" width="2" height="50""")/>><rect fill="black" x="49" y="0" width="1" height="50""")/>><rect fill="black" x="52" y="0" width="1" height="50""")/>><rect fill="black" x="55" y="0" width="1" height="50""")/>><rect fill="black" x="58" y="0" width="1" height="50""")/>><rect fill="black" x="61" y="0" width="1" height="50""")/>><rect fill="black" x="64" y="0" width="1" height="50""")/>><rect fill="black" x="67" y="0" width="2" height="50""")/>><rect fill="black" x="71" y="0" width="1" height="50""")/>><rect fill="black" x="74" y="0" width="2" height="50""")/>><rect fill="black" x="78" y="0" width="1" height="50""")/>><rect fill="black" x="81" y="0" width="1" height="50""")/>><rect fill="black" x="84" y="0" width="1" height="50""")/>><rect fill="black" x="87" y="0" width="1" height="50""")/>><rect fill="black" x="90" y="0" width="1" height="50""")/>><rect fill="black" x="93" y="0" width="1" height="50""")/>><rect fill="black" x="96" y="0" width="2" height="50""")/>><rect fill="black" x="100" y="0" width="1" height="50""")/>><rect fill="black" x="103" y="0" width="1" height="50""")/>><rect fill="black" x="106" y="0" width="1" height="50""")/>><rect fill="black" x="109" y="0" width="1" height="50""")/>><rect fill="black" x="112" y="0" width="1" height="50""")/>><rect fill="black" x="115" y="0" width="1" height="50""")/>><rect fill="black" x="118" y="0" width="2" height="50""")/>><rect fill="black" x="122" y="0" width="2" height="50""")/>><rect fill="black" x="126" y="0" width="1" height="50""")/>><rect fill="black" x="129" y="0" width="1" height="50""")/>><rect fill="black" x="132" y="0" width="1" height="50""")/>><rect fill="black" x="135" y="0" width="1" height="50""")/>><rect fill="black" x="138" y="0" width="1" height="50""")/>><rect fill="black" x="141" y="0" width="1" height="50""")/>><rect fill="black" x="144" y="0" width="2" height="50""")/>>`,
                       }}
-                    ></svg>
+                    />
                     <div className="barcode-sku">{sku}</div>
                   </div>
                 ))}

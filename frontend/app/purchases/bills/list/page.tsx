@@ -9,20 +9,17 @@ import {
   RefreshCcw,
   ChevronLeft,
   ChevronRight,
+  Filter,
+  Calendar,
+  Wallet,
+  ArrowUpRight,
+  XCircle,
+  MoreHorizontal,
 } from "lucide-react";
-
-type Bill = {
-  _id: string;
-  billNo?: string;
-  supplier?: { name?: string };
-  totalAmount?: number;
-  paidAmount?: number;
-  dueAmount?: number;
-  createdAt?: string;
-};
+import { cn } from "@/lib/utils";
 
 export default function BillListPage() {
-  const [list, setList] = useState<Bill[]>([]);
+  const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Filters
@@ -48,93 +45,83 @@ export default function BillListPage() {
       setList(Array.isArray(res) ? res : []);
     } catch (error) {
       console.error(error);
-      alert("Failed to load bills");
     } finally {
       setLoading(false);
     }
   }
 
-  // FILTERED LIST
   const filtered = useMemo(() => {
     let data = [...list];
-
     const s = search.toLowerCase();
 
-    data = data.filter((b) => {
+    return data.filter((b) => {
       const billNo = (b.billNo || "").toLowerCase();
       const supplier = (b.supplier?.name || "").toLowerCase();
       const total = Number(b.totalAmount || 0);
+      const date = new Date(b.createdAt!);
 
-      // search
       if (s && !billNo.includes(s) && !supplier.includes(s)) return false;
-
-      // status filter
       if (statusFilter === "paid" && Number(b.dueAmount) !== 0) return false;
       if (statusFilter === "due" && Number(b.dueAmount) === 0) return false;
-
-      // amount filter
       if (minAmount && total < Number(minAmount)) return false;
       if (maxAmount && total > Number(maxAmount)) return false;
-
-      // date filter
-      if (startDate) {
-        if (new Date(b.createdAt!) < new Date(startDate)) return false;
-      }
-      if (endDate) {
-        if (new Date(b.createdAt!) > new Date(endDate)) return false;
-      }
+      if (startDate && date < new Date(startDate)) return false;
+      if (endDate && date > new Date(endDate)) return false;
 
       return true;
     });
-
-    return data;
   }, [list, search, minAmount, maxAmount, startDate, endDate, statusFilter]);
 
-  // PAGINATION DATA
   const totalPages = Math.ceil(filtered.length / rowsPerPage);
   const paginated = filtered.slice(
     (page - 1) * rowsPerPage,
     page * rowsPerPage
   );
 
-  // CSV EXPORT
-  function exportCSV() {
-    const headers = ["Bill No", "Supplier", "Total", "Paid", "Due", "Date"];
-    const rows = filtered.map((b) => [
-      b.billNo,
-      b.supplier?.name,
-      b.totalAmount,
-      b.paidAmount,
-      b.dueAmount,
-      new Date(b.createdAt!).toLocaleString(),
-    ]);
-
-    const csv =
-      headers.join(",") + "\n" + rows.map((r) => r.join(",")).join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "purchase-bills.csv";
-    a.click();
-  }
-
   return (
-    <div className="p-6">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen pb-10">
+      {/* 1. TOP HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Purchase Bills</h1>
-          <div className="text-sm text-gray-500">
-            Manage, view and export purchase bills
-          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            Purchase Ledger
+          </h1>
+          <p className="text-gray-500 text-sm font-medium">
+            Track supplier liabilities and payment settlements.
+          </p>
         </div>
 
-        <div className="flex gap-3">
-          {/* Clear */}
+        <div className="flex items-center gap-3">
           <button
-            className="p-2 border rounded-lg hover:bg-gray-100"
+            onClick={load}
+            className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 text-gray-500 transition-all"
+          >
+            <RefreshCcw size={18} className={cn(loading && "animate-spin")} />
+          </button>
+
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 font-bold text-xs text-gray-700 uppercase tracking-widest"
+          >
+            <FileDown size={16} /> Export
+          </button>
+
+          <Link
+            href="/purchases/create-bill"
+            className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-xl shadow-lg hover:bg-amber-700 shadow-amber-100 transition-all font-bold text-sm"
+          >
+            Create New Bill
+          </Link>
+        </div>
+      </div>
+
+      {/* 2. ADVANCED FILTER RIBBON */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-50 pb-3">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] flex items-center gap-2">
+            <Filter size={14} /> Filter Parameters
+          </h3>
+          <button
             onClick={() => {
               setSearch("");
               setMinAmount("");
@@ -143,179 +130,175 @@ export default function BillListPage() {
               setEndDate("");
               setStatusFilter("all");
             }}
+            className="text-[10px] font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-all flex items-center gap-1"
           >
-            Clear
+            <XCircle size={12} /> CLEAR ALL
           </button>
-          <button
-            onClick={load}
-            className="px-3 py-2 border rounded-lg flex items-center gap-2 hover:bg-gray-100"
-          >
-            <RefreshCcw size={16} /> Refresh
-          </button>
-
-          <button
-            onClick={exportCSV}
-            className="px-3 py-2 bg-slate-800 text-white rounded-lg flex items-center gap-2"
-          >
-            <FileDown size={16} /> Export CSV
-          </button>
-
-          <Link
-            href="/purchases/create-bill"
-            className="px-3 py-2 bg-amber-500 text-white rounded-lg shadow hover:bg-amber-600"
-          >
-            New Bill
-          </Link>
         </div>
-      </div>
 
-      {/* FILTER BAR */}
-      <div className="bg-white/70 shadow p-4 rounded-xl mb-5 grid grid-cols-1 md:grid-cols-7 gap-3 border backdrop-blur">
-        {/* Search */}
-        <div className="relative col-span-2">
-          <Search className="absolute left-3 top-3 text-gray-500" size={17} />
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          <div className="md:col-span-2 relative">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={16}
+            />
+            <input
+              placeholder="Bill No or Vendor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-amber-500 text-sm transition-all"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border-transparent rounded-lg text-xs font-bold text-gray-600 appearance-none focus:bg-white"
+          >
+            <option value="all">All Statuses</option>
+            <option value="paid">Settled (Paid)</option>
+            <option value="due">Outstanding (Due)</option>
+          </select>
+
           <input
-            className="pl-9 p-2.5 border rounded-lg w-full"
-            placeholder="Search bill / supplier..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border-transparent rounded-lg text-xs text-gray-500"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border-transparent rounded-lg text-xs text-gray-500"
+          />
+
+          <input
+            placeholder="Min Amt"
+            value={minAmount}
+            onChange={(e) => setMinAmount(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border-transparent rounded-lg text-xs"
+          />
+          <input
+            placeholder="Max Amt"
+            value={maxAmount}
+            onChange={(e) => setMaxAmount(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border-transparent rounded-lg text-xs"
           />
         </div>
-
-        {/* Status */}
-        <select
-          className="p-2 border rounded-lg"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">All Bills</option>
-          <option value="paid">Fully Paid</option>
-          <option value="due">Due Only</option>
-        </select>
-
-        {/* Date From */}
-        <input
-          type="date"
-          className="p-2 border rounded-lg"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-
-        {/* Date To */}
-        <input
-          type="date"
-          className="p-2 border rounded-lg"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
-
-        {/* Min Amount */}
-        <input
-          className="p-2 border rounded-lg"
-          placeholder="Min amount"
-          value={minAmount}
-          onChange={(e) => setMinAmount(e.target.value)}
-        />
-
-        {/* Max Amount */}
-        <input
-          className="p-2 border rounded-lg"
-          placeholder="Max amount"
-          value={maxAmount}
-          onChange={(e) => setMaxAmount(e.target.value)}
-        />
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white/70 p-4 rounded-2xl shadow-xl border backdrop-blur overflow-x-auto">
-        {loading ? (
-          <div className="p-6 text-center text-gray-500">Loading…</div>
-        ) : (
-          <table className="w-full text-md">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="p-2 text-left">Bill#</th>
-                <th>Supplier</th>
-                <th>Total</th>
-                <th>Paid</th>
-                <th>Due</th>
-                <th>Date</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginated.map((b) => (
-                <tr key={b._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 font-medium">{b.billNo}</td>
-                  <td>{b.supplier?.name || "—"}</td>
-                  <td>₹{b.totalAmount}</td>
-                  <td>₹{b.paidAmount}</td>
-                  <td className={b.dueAmount! > 0 ? "text-red-600" : ""}>
-                    ₹{b.dueAmount}
-                  </td>
-                  <td>{new Date(b.createdAt!).toLocaleDateString()}</td>
-
-                  <td className="text-right pr-3 flex justify-end gap-4">
-                    <button
-                      onClick={() =>
-                        window.open(
-                          `/purchases/bills/pdf/${b._id}?t=${Date.now()}`,
-                          "_blank"
-                        )
-                      }
-                      className="text-slate-700 hover:text-black flex items-center gap-1"
+      {/* 3. FINANCIAL TABLE */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-gray-50 border-b border-gray-100 font-black text-gray-400 uppercase text-[10px] tracking-widest">
+            <tr>
+              <th className="px-6 py-4">Reference</th>
+              <th className="px-6 py-4">Supplier Account</th>
+              <th className="px-6 py-4 text-right">Total Billing</th>
+              <th className="px-6 py-4 text-right">Settled Amount</th>
+              <th className="px-6 py-4 text-center">Liability Status</th>
+              <th className="px-6 py-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {paginated.map((b) => (
+              <tr
+                key={b._id}
+                className="hover:bg-amber-50/20 transition-colors group"
+              >
+                <td className="px-6 py-4">
+                  <div className="font-mono font-bold text-amber-600">
+                    {b.billNo}
+                  </div>
+                  <div className="text-[10px] text-gray-400 font-medium">
+                    {new Date(b.createdAt!).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                      <Wallet size={16} />
+                    </div>
+                    <span className="font-bold text-gray-900">
+                      {b.supplier?.name || "—"}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right font-bold text-gray-900">
+                  ₹{Number(b.totalAmount || 0).toLocaleString()}
+                </td>
+                <td className="px-6 py-4 text-right text-emerald-600 font-medium">
+                  ₹{Number(b.paidAmount || 0).toLocaleString()}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <div
+                    className={cn(
+                      "inline-flex flex-col items-center px-3 py-1 rounded-xl border w-24",
+                      b.dueAmount! > 0
+                        ? "bg-rose-50 border-rose-100"
+                        : "bg-emerald-50 border-emerald-100"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "text-[10px] font-black uppercase tracking-tighter",
+                        b.dueAmount! > 0 ? "text-rose-600" : "text-emerald-600"
+                      )}
                     >
-                      <FileDown size={16} /> PDF
-                    </button>
-
+                      {b.dueAmount! > 0 ? "Outstanding" : "Settled"}
+                    </span>
+                    <span className="text-[11px] font-bold">
+                      ₹{b.dueAmount?.toLocaleString()}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
                     <Link
                       href={`/purchases/bills/${b._id}`}
-                      prefetch={false}
-                      className="text-amber-600 font-medium"
+                      className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                     >
-                      View
+                      <ArrowUpRight size={18} />
                     </Link>
-                  </td>
-                </tr>
-              ))}
+                    <button className="p-2 text-gray-300 hover:text-gray-600">
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-              {paginated.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500">
-                    No bills found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* PAGINATION */}
-      <div className="flex justify-between items-center mt-5 text-sm text-gray-600">
-        <div>Rows per page: {rowsPerPage}</div>
-
-        <div className="flex items-center gap-2">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="border px-2 py-1 rounded disabled:opacity-40"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
-          <span>
-            Page {page} of {totalPages || 1}
-          </span>
-
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="border px-2 py-1 rounded disabled:opacity-40"
-          >
-            <ChevronRight size={16} />
-          </button>
+        {/* 4. PAGINATION FOOTER */}
+        <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Showing <span className="text-gray-900">{paginated.length}</span> of{" "}
+            {filtered.length} entries
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="p-2 bg-white border border-gray-200 rounded-lg disabled:opacity-30 hover:bg-gray-50"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-[10px] font-black text-amber-600 px-4">
+              PAGE {page} OF {totalPages || 1}
+            </span>
+            <button
+              disabled={page === totalPages || totalPages === 0}
+              onClick={() => setPage((p) => p + 1)}
+              className="p-2 bg-white border border-gray-200 rounded-lg disabled:opacity-30 hover:bg-gray-50"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

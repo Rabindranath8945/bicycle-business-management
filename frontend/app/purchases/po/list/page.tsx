@@ -6,24 +6,19 @@ import Link from "next/link";
 import {
   FileDown,
   RefreshCcw,
-  PlusCircle,
+  Plus,
   Search,
   Printer,
+  MoreVertical,
+  ExternalLink,
+  Filter,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-type PO = {
-  _id: string;
-  poNumber: string;
-  supplier: any;
-  status: string;
-  createdAt: string;
-  items: any[];
-};
-
 export default function POListPremium() {
-  const [list, setList] = useState<PO[]>([]);
+  const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [q, setQ] = useState("");
@@ -39,17 +34,14 @@ export default function POListPremium() {
       setList(res);
     } catch (e) {
       console.error(e);
-      alert("Failed to fetch POs");
     } finally {
       setLoading(false);
     }
   }
 
-  // 🔍 FILTER LOGIC
   const filtered = useMemo(() => {
     return list.filter((po) => {
       if (statusFilter !== "all" && po.status !== statusFilter) return false;
-
       if (q.trim()) {
         const s = q.toLowerCase();
         return (
@@ -57,176 +49,204 @@ export default function POListPremium() {
           (po.supplier?.name || "").toLowerCase().includes(s)
         );
       }
-
       return true;
     });
   }, [list, statusFilter, q]);
 
-  // 🧾 EXPORT SINGLE PO TO PDF
-  function exportSinglePO(po: PO) {
-    const doc = new jsPDF();
-
-    doc.setFontSize(18);
-    doc.text(`Purchase Order: ${po.poNumber}`, 14, 20);
-
-    doc.setFontSize(12);
-    doc.text(`Supplier: ${po.supplier?.name}`, 14, 30);
-    doc.text(`Created: ${new Date(po.createdAt).toLocaleString()}`, 14, 38);
-    doc.text(`Status: ${po.status}`, 14, 46);
-
-    autoTable(doc, {
-      startY: 55,
-      head: [["Product", "Qty", "Rate"]],
-      body: po.items.map((i: any) => [
-        i.product?.name || "",
-        i.quantity,
-        `₹${i.rate}`,
-      ]),
-    });
-
-    doc.save(`${po.poNumber}.pdf`);
-  }
-
-  // 🧾 EXPORT FULL LIST AS PDF
-  function exportAllPO() {
-    const doc = new jsPDF();
-    doc.text("Purchase Order List", 14, 20);
-
-    autoTable(doc, {
-      startY: 30,
-      head: [["PO#", "Supplier", "Items", "Status", "Date"]],
-      body: filtered.map((po) => [
-        po.poNumber,
-        po.supplier?.name,
-        (po.items || []).length,
-        po.status,
-        new Date(po.createdAt).toLocaleDateString(),
-      ]),
-    });
-
-    doc.save("purchase-orders.pdf");
-  }
+  const getStatusStyles = (s: string) => {
+    switch (s) {
+      case "draft":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "confirmed":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "partially_received":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "complete":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "cancelled":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
+    }
+  };
 
   return (
-    <div className="p-6">
-      {/* HEADER SECTION */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold tracking-wide">
-          Purchase Orders
-        </h2>
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen pb-10">
+      {/* 1. HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            Purchase Orders
+          </h1>
+          <p className="text-gray-500">
+            Manage procurement cycles and vendor shipments.
+          </p>
+        </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={exportAllPO}
-            className="px-3 py-2 bg-slate-700 text-white rounded-lg shadow flex items-center gap-2 hover:bg-slate-800"
-          >
-            <Printer size={16} /> Export PDF
-          </button>
-
+        <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="px-3 py-2 border rounded-lg shadow hover:bg-gray-100 flex items-center gap-2"
+            className="p-2.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 text-gray-600 transition-all"
+            title="Refresh Data"
           >
-            <RefreshCcw size={16} /> Refresh
+            <RefreshCcw size={18} className={cn(loading && "animate-spin")} />
           </button>
-
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-medium text-sm text-gray-700 transition-all"
+          >
+            <Printer size={18} /> Export List
+          </button>
           <Link
             href="/purchases/create-po"
-            className="px-3 py-2 bg-amber-500 text-white rounded-lg shadow flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg shadow-lg hover:bg-indigo-700 shadow-indigo-200 transition-all font-medium text-sm"
           >
-            <PlusCircle size={18} /> New PO
+            <Plus size={18} /> Create New PO
           </Link>
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 items-center">
-        <div className="relative col-span-2">
-          <Search className="absolute left-3 top-3 text-gray-500" size={18} />
+      {/* 2. SMART FILTERS BAR */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div className="lg:col-span-6 relative">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
+          />
           <input
-            placeholder="Search PO or Supplier..."
+            placeholder="Search by PO number or supplier name..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="pl-10 p-2 border rounded-lg w-full shadow-sm"
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
           />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="p-2 border rounded-lg shadow-sm"
-        >
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="partially_received">Partially Received</option>
-          <option value="complete">Complete</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+        <div className="lg:col-span-3 relative">
+          <Filter
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={16}
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all text-sm appearance-none"
+          >
+            <option value="all">All Statuses</option>
+            <option value="draft">Draft Orders</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="partially_received">Partially Received</option>
+            <option value="complete">Complete</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
 
-        <div className="text-right text-gray-500 text-sm">
-          Showing {filtered.length} of {list.length}
+        <div className="lg:col-span-3 text-right text-xs font-bold text-gray-400 uppercase tracking-widest">
+          Results: <span className="text-indigo-600">{filtered.length}</span> /{" "}
+          {list.length}
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-white/40">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 sticky top-0 z-10">
-            <tr className="text-left border-b">
-              <th className="py-2 px-2">PO#</th>
-              <th>Supplier</th>
-              <th>Items</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th className="text-right pr-2">Actions</th>
+      {/* 3. PREMIUM TABLE CONTAINER */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider">
+                PO Number
+              </th>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider">
+                Supplier Details
+              </th>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider text-center">
+                Lines
+              </th>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider text-center">
+                Status
+              </th>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider">
+                Date Created
+              </th>
+              <th className="px-6 py-4 font-bold text-gray-600 uppercase text-[11px] tracking-wider text-right">
+                Actions
+              </th>
             </tr>
           </thead>
-
-          <tbody>
+          <tbody className="divide-y divide-gray-50">
             {filtered.map((po) => (
               <tr
                 key={po._id}
-                className="border-b hover:bg-gray-50 transition-all"
+                className="hover:bg-indigo-50/30 transition-colors group"
               >
-                <td className="py-3 px-2 font-medium">{po.poNumber}</td>
-                <td>{po.supplier?.name}</td>
-                <td>{po.items.length}</td>
-
-                <td>
+                <td className="px-6 py-4">
+                  <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                    {po.poNumber}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="font-bold text-gray-900">
+                    {po.supplier?.name}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    ID: {po.supplier?._id?.slice(-6).toUpperCase()}
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full font-medium text-xs">
+                    {po.items?.length || 0} SKU(s)
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-center">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs ${statusBadge(
-                      po.status
-                    )}`}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[11px] font-bold border uppercase tracking-tighter",
+                      getStatusStyles(po.status)
+                    )}
                   >
                     {po.status.replace("_", " ")}
                   </span>
                 </td>
-
-                <td>{new Date(po.createdAt).toLocaleDateString()}</td>
-
-                <td className="text-right flex justify-end gap-3 py-2 pr-2">
-                  <Link
-                    href={`/purchases/po/${po._id}`}
-                    className="text-amber-600 font-medium"
-                  >
-                    View
-                  </Link>
-
-                  <button
-                    onClick={() => exportSinglePO(po)}
-                    className="text-slate-600 hover:text-black flex items-center gap-1"
-                  >
-                    <FileDown size={16} /> PDF
-                  </button>
+                <td className="px-6 py-4 text-gray-500 font-medium">
+                  {new Date(po.createdAt).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end items-center gap-2">
+                    <Link
+                      href={`/purchases/po/${po._id}`}
+                      className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all"
+                      title="View Details"
+                    >
+                      <ExternalLink size={18} />
+                    </Link>
+                    <button
+                      onClick={() => {}}
+                      className="p-2 text-gray-400 hover:text-gray-900 rounded-lg transition-all"
+                    >
+                      <FileDown size={18} />
+                    </button>
+                    <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all">
+                      <MoreVertical size={18} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
 
-            {filtered.length === 0 && (
+            {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="text-center py-6 text-gray-500">
-                  No purchase orders found
+                <td colSpan={6} className="px-6 py-20 text-center">
+                  <div className="max-w-xs mx-auto space-y-3 opacity-40">
+                    <Search size={48} className="mx-auto text-gray-300" />
+                    <p className="text-sm font-bold text-gray-900 uppercase tracking-widest">
+                      No Records Found
+                    </p>
+                    <p className="text-xs">
+                      Try adjusting your filters or search terms.
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}
@@ -235,21 +255,4 @@ export default function POListPremium() {
       </div>
     </div>
   );
-}
-
-function statusBadge(s: string) {
-  switch (s) {
-    case "draft":
-      return "bg-yellow-100 text-yellow-700";
-    case "confirmed":
-      return "bg-green-100 text-green-700";
-    case "partially_received":
-      return "bg-amber-100 text-amber-700";
-    case "complete":
-      return "bg-blue-100 text-blue-700";
-    case "cancelled":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-gray-100 text-gray-700";
-  }
 }

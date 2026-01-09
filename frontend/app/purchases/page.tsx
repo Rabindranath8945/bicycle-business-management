@@ -2,10 +2,33 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { fetcher } from "@/lib/api";
-import KPICard from "@/components/ui/KPICard";
-import WorkflowCard from "@/components/ui/WorkFlowCard";
-import SupplierCard from "@/components/ui/SupplierCard";
+import { cn } from "@/lib/utils";
+import {
+  ShoppingCart,
+  Package,
+  Receipt,
+  RotateCcw,
+  Plus,
+  Truck,
+  Users,
+  CreditCard,
+  FilePlus,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Activity,
+  History,
+  ClipboardList,
+} from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 type KPIs = {
   totalPOs: number;
@@ -14,290 +37,259 @@ type KPIs = {
   totalReturns: number;
   monthSpend: number;
   outstanding: number;
-  monthlySeries: number[]; // 12 points
+  monthlySeries: { name: string; spend: number }[];
 };
 
 export default function PurchasesDashboard() {
   const [kpis, setKpis] = useState<KPIs | null>(null);
-  const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    load();
+    // Mocking the data structure to match the Sales Dashboard style
+    const mockData: KPIs = {
+      totalPOs: 142,
+      pendingGRNs: 8,
+      totalBills: 125,
+      totalReturns: 3,
+      monthSpend: 890000,
+      outstanding: 452000,
+      monthlySeries: [
+        { name: "Jan", spend: 400000 },
+        { name: "Feb", spend: 300000 },
+        { name: "Mar", spend: 600000 },
+        { name: "Apr", spend: 890000 },
+      ],
+    };
+    setKpis(mockData);
+    setLoading(false);
   }, []);
 
-  async function load() {
-    setLoading(true);
-    try {
-      // your backend must provide stats endpoint; fallback to multiple endpoints if not
-      const stats = await fetcher("/api/dashboard/purchase-stats").catch(
-        async () => {
-          // fallback: gather manually
-          const [poList, grnList, bills, returns] = await Promise.all([
-            fetcher("/api/purchase-orders").catch(() => []),
-            fetcher("/api/grn").catch(() => []),
-            fetcher("/api/purchases").catch(() => []),
-            fetcher("/api/purchase-returns").catch(() => []),
-          ]);
-          const series = new Array(12)
-            .fill(0)
-            .map((_, i) => Math.round(Math.random() * 8000));
-          return {
-            totalPOs: poList.length,
-            pendingGRNs:
-              grnList.filter(
-                (g: any) =>
-                  g.purchaseOrder &&
-                  g.items &&
-                  g.items.some(
-                    (it: any) =>
-                      it.receivedQty < (it.expectedQty || it.receivedQty)
-                  )
-              ).length || 0,
-            totalBills: bills.length,
-            totalReturns: returns.length,
-            monthSpend: bills.reduce(
-              (s: any, b: any) => s + (b.totalAmount || 0),
-              0
-            ),
-            outstanding: bills.reduce(
-              (s: any, b: any) => s + (b.dueAmount || 0),
-              0
-            ),
-            monthlySeries: series,
-          } as KPIs;
-        }
-      );
-      setKpis(stats);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const spark = useMemo(
-    () => (kpis ? kpis.monthlySeries : new Array(12).fill(0)),
-    [kpis]
-  );
-
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Purchase Management</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/purchases/create-po"
-            className="px-3 py-2 bg-amber-500 text-white rounded shadow"
-          >
-            Create PO
-          </Link>
-          <Link
-            href="/purchases/receive-grn"
-            className="px-3 py-2 border rounded"
-          >
-            Receive GRN
-          </Link>
-          <Link
-            href="/purchases/create-bill"
-            className="px-3 py-2 border rounded"
-          >
-            Create Bill
-          </Link>
+  const KPICard = ({
+    title,
+    value,
+    sub,
+    icon: Icon,
+    colorClass,
+    delta,
+    currency = false,
+  }: any) => (
+    <div className="group relative overflow-hidden bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+      <div className="flex justify-between items-start">
+        <div className={cn("p-3 rounded-lg text-white shadow-md", colorClass)}>
+          <Icon size={18} />
         </div>
+        {delta && (
+          <span
+            className={cn(
+              "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
+              delta > 0
+                ? "bg-emerald-50 text-emerald-600"
+                : "bg-rose-50 text-rose-600"
+            )}
+          >
+            {delta > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}{" "}
+            {Math.abs(delta)}%
+          </span>
+        )}
       </div>
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <KPICard
-          title="Total PO"
-          value={kpis?.totalPOs ?? "—"}
-          sub="All purchase orders"
-          icon="📄"
-        />
-        <KPICard
-          title="Pending GRNs"
-          value={kpis?.pendingGRNs ?? "—"}
-          sub="Awaiting receipt"
-          icon="📦"
-        />
-        <KPICard
-          title="Bills"
-          value={kpis?.totalBills ?? "—"}
-          sub="Supplier invoices"
-          icon="🧾"
-        />
-        <KPICard
-          title="Returns"
-          value={kpis?.totalReturns ?? "—"}
-          sub="Purchase returns"
-          icon="↩️"
-        />
-        <KPICard
-          title="This Month Spend"
-          value={kpis ? `₹${kpis.monthSpend.toLocaleString()}` : "—"}
-          sub="Expenditure (M)"
-          icon="💸"
-          sparkData={spark}
-        />
-        <KPICard
-          title="Outstanding"
-          value={kpis ? `₹${kpis.outstanding.toLocaleString()}` : "—"}
-          sub="Supplier dues"
-          icon="⚠️"
-        />
-      </div>
-
-      {/* Workflow + Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <WorkflowCard
-              title="Create Purchase Order"
-              href="/purchases/create-po"
-              desc="Create PO & send to supplier"
-              icon="📝"
-            />
-            <WorkflowCard
-              title="Receive Goods (GRN)"
-              href="/purchases/receive-grn"
-              desc="Receive items & add batches"
-              icon="📦"
-            />
-            <WorkflowCard
-              title="Create Purchase Bill"
-              href="/purchases/create-bill"
-              desc="Record supplier invoice & payments"
-              icon="💳"
-            />
-            <WorkflowCard
-              title="Purchase Return"
-              href="/purchases/returns"
-              desc="Return defective items"
-              icon="🔁"
-            />
-          </div>
-
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-4 shadow border border-white/30">
-            <h3 className="font-semibold mb-3">Monthly Purchases</h3>
-            <div className="h-44 w-full">
-              <Sparkline data={kpis?.monthlySeries ?? new Array(12).fill(0)} />
-            </div>
-            <div className="mt-3 text-sm text-gray-500">
-              Spending trend for last 12 months
-            </div>
-          </div>
-
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-4 shadow border border-white/30">
-            <h3 className="font-semibold mb-3">Top Suppliers</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {(topSuppliers.length ? topSuppliers : new Array(3).fill(0)).map(
-                (s: any, i: number) => (
-                  <SupplierCard
-                    key={i}
-                    supplier={
-                      s || {
-                        name: `Supplier ${i + 1}`,
-                        total: Math.round(Math.random() * 50000),
-                      }
-                    }
-                  />
-                )
-              )}
-            </div>
-          </div>
-        </div>
-
-        <aside className="space-y-6">
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-4 shadow border border-white/30">
-            <h4 className="font-semibold mb-2">Quick Actions</h4>
-            <div className="flex flex-col gap-2">
-              <Link
-                href="/purchases/create-po"
-                className="px-3 py-2 bg-amber-500 text-white rounded"
-              >
-                + New PO
-              </Link>
-              <Link
-                href="/purchases/receive-grn"
-                className="px-3 py-2 border rounded"
-              >
-                Receive GRN
-              </Link>
-              <Link
-                href="/purchases/create-bill"
-                className="px-3 py-2 border rounded"
-              >
-                Create Bill
-              </Link>
-            </div>
-          </div>
-
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-4 shadow border border-white/30">
-            <h4 className="font-semibold mb-2">Shortcuts</h4>
-            <ul className="text-sm text-gray-600 space-y-2">
-              <li>
-                <Link
-                  href="/purchases/po/list"
-                  className="text-amber-600 hover:underline"
-                >
-                  All Purchase Orders
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/purchases/grn/list"
-                  className="text-amber-600 hover:underline"
-                >
-                  All GRNs
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/purchases/bills/list"
-                  className="text-amber-600 hover:underline"
-                >
-                  All Bills
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </aside>
+      <div className="mt-4">
+        <p className="text-xs font-medium text-gray-500">{title}</p>
+        <h3 className="text-xl font-bold text-gray-900 mt-1">
+          {currency ? `₹${value?.toLocaleString("en-IN")}` : value}
+        </h3>
+        <p className="text-xs text-gray-400 mt-1">{sub}</p>
       </div>
     </div>
   );
-}
 
-/* ---------- Small helper components used inline ---------- */
+  const WORKFLOW_ITEMS = [
+    {
+      title: "New PO",
+      desc: "Order stock",
+      icon: FilePlus,
+      color: "bg-blue-50 text-blue-600",
+      href: "/purchases/create-po",
+    },
+    {
+      title: "Receive Goods",
+      desc: "GRN Entry",
+      icon: Truck,
+      color: "bg-emerald-50 text-emerald-600",
+      href: "/grn/new",
+    },
+    {
+      title: "Suppliers",
+      desc: "Manage vendors",
+      icon: Users,
+      color: "bg-purple-50 text-purple-600",
+      href: "/suppliers",
+    },
+    {
+      title: "Bills",
+      desc: "Pay invoices",
+      icon: ClipboardList,
+      color: "bg-amber-50 text-amber-600",
+      href: "/purchases/bills",
+    },
+  ];
 
-function Sparkline({ data }: { data: number[] }) {
-  const W = 600,
-    H = 120,
-    padding = 6;
-  const max = Math.max(...data, 1);
-  const points = data
-    .map((v, i) => {
-      const x = padding + (i / (data.length - 1)) * (W - padding * 2);
-      const y = H - padding - (v / max) * (H - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(" ");
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="url(#g1)"
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <defs>
-        <linearGradient id="g1" x1="0" x2="1">
-          <stop offset="0" stopColor="#f97316" />
-          <stop offset="1" stopColor="#fb923c" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <div className="p-6 space-y-8 pb-10 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            Purchase Dashboard
+          </h1>
+          <p className="text-gray-500">
+            Procurement and vendor management overview (Odoo Style).
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/purchases/all"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-100 font-medium text-sm text-gray-700 transition-all"
+          >
+            <Receipt size={18} /> View All Orders
+          </Link>
+          <Link
+            href="/purchases/create-po"
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-lg shadow-lg hover:bg-amber-700 transition-all font-medium text-sm"
+          >
+            <Plus size={18} /> Create New PO
+          </Link>
+        </div>
+      </div>
+
+      {/* KPI Grid 1: Financials */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Monthly Spend"
+          value={kpis?.monthSpend}
+          currency
+          sub="Total this month"
+          icon={DollarSign}
+          colorClass="bg-emerald-600"
+          delta={14.2}
+        />
+        <KPICard
+          title="Outstanding Payables"
+          value={kpis?.outstanding}
+          currency
+          sub="Pending payments"
+          icon={CreditCard}
+          colorClass="bg-rose-600"
+          delta={-2.5}
+        />
+        <KPICard
+          title="Total Orders"
+          value={kpis?.totalPOs}
+          sub="Lifetime PO count"
+          icon={Activity}
+          colorClass="bg-indigo-600"
+        />
+        <KPICard
+          title="Active Returns"
+          value={kpis?.totalReturns}
+          sub="Claims in progress"
+          icon={RotateCcw}
+          colorClass="bg-amber-500"
+        />
+      </div>
+
+      {/* KPI Grid 2: Operational Status */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <KPICard
+          title="Pending GRNs"
+          value={kpis?.pendingGRNs}
+          sub="Goods yet to arrive"
+          icon={Package}
+          colorClass="bg-blue-500"
+        />
+        <KPICard
+          title="Unbilled POs"
+          value={12}
+          sub="Goods received, no bill"
+          icon={Receipt}
+          colorClass="bg-purple-500"
+        />
+        <KPICard
+          title="Lead Time"
+          value="4.2 Days"
+          sub="Average fulfillment"
+          icon={History}
+          colorClass="bg-slate-600"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Spending Chart */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <TrendingUp size={20} className="text-emerald-600" /> Purchase Trend
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={kpis?.monthlySeries}>
+                <defs>
+                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#059669" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f0f0f0"
+                />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: "#9ca3af" }}
+                />
+                <YAxis hide />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="spend"
+                  stroke="#059669"
+                  fillOpacity={1}
+                  fill="url(#colorSpend)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Workflow Actions Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-gray-900">Quick Operations</h3>
+          {WORKFLOW_ITEMS.map((item, idx) => (
+            <Link
+              key={idx}
+              href={item.href}
+              className="flex items-center p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+            >
+              <div
+                className={cn(
+                  "p-3 rounded-lg mr-4 group-hover:scale-110 transition-transform",
+                  item.color
+                )}
+              >
+                <item.icon size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">
+                  {item.title}
+                </h4>
+                <p className="text-xs text-gray-500">{item.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
